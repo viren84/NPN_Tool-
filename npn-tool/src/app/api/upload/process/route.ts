@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireEditor, isErrorResponse } from "@/lib/auth/guard";
 import { extractFromDocument, extractLicencePDF, extractCOA, extractStudy } from "@/lib/ai/document-reader";
-import { PDFParse } from "pdf-parse";
+import { extractTextFromPDF } from "@/lib/documents/pdf-reader";
 
 export async function POST(req: NextRequest) {
   const user = await requireEditor();
@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     // Size limit: 20MB
     if (file.size > 20 * 1024 * 1024) {
-      return NextResponse.json({ error: "File too large. Max 20MB." }, { status: 400 });
+      return NextResponse.json({ error: `File too large (${Math.round(file.size / 1024 / 1024)}MB). Maximum is 20MB.` }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
@@ -26,55 +26,62 @@ export async function POST(req: NextRequest) {
 
     // Extract text based on file type
     if (file.name.toLowerCase().endsWith(".pdf")) {
-      const parser = new PDFParse({ data: buffer });
-      const pdfResult = await parser.getText();
-      textContent = pdfResult.text || "";
+      try {
+        textContent = await extractTextFromPDF(buffer);
+      } catch (pdfError) {
+        const pdfMsg = pdfError instanceof Error ? pdfError.message : "PDF could not be read";
+        return NextResponse.json({
+          error: pdfMsg,
+          details: `File: ${file.name} (${Math.round(file.size / 1024)}KB)`,
+        }, { status: 422 });
+      }
     } else if (file.name.toLowerCase().endsWith(".csv")) {
       textContent = buffer.toString("utf-8");
     } else if (file.name.toLowerCase().endsWith(".txt")) {
       textContent = buffer.toString("utf-8");
     } else {
-      // Try as text
       textContent = buffer.toString("utf-8");
     }
 
     if (!textContent || textContent.trim().length < 10) {
       return NextResponse.json({
-        error: "Could not extract text from file. The file may be scanned/image-based.",
-        suggestion: "Try a text-based PDF or contact support for image-based document processing."
+        error: "No readable text found in this PDF. It may be a scanned image.",
+        suggestion: "Try a text-based PDF, or ensure it is not a scanned document.",
+        details: `File: ${file.name}, extracted ${textContent.trim().length} chars`,
       }, { status: 422 });
     }
 
-    // Route to type-specific extractor if context is provided
+    // Route to type-specific extractor
     let result;
-    switch (context) {
-      case "licence_pdf":
-        result = {
-          documentType: "licence_pdf",
-          confidence: 0.9,
-          extractedData: await extractLicencePDF(textContent),
-          warnings: [],
-        };
-        break;
-      case "coa":
-        result = {
-          documentType: "coa",
-          confidence: 0.9,
-          extractedData: await extractCOA(textContent),
-          warnings: [],
-        };
-        break;
-      case "study":
-        result = {
-          documentType: "study",
-          confidence: 0.9,
-          extractedData: await extractStudy(textContent),
-          warnings: [],
-        };
-        break;
-      default:
-        // Auto-classify and extract
-        result = await extractFromDocument(textContent, file.name, context);
+    try {
+      switch (context) {
+        case "licence_pdf": {
+          const extracted = await extractLicencePDF(textContent);
+          // Check if AI returned an error
+          if (extracted.error) {
+            return NextResponse.json({
+              error: String(extracted.error),
+              details: `AI could not extract data from ${file.name}`,
+            }, { status: 422 });
+          }
+          result = { documentType: "licence_pdf", confidence: 0.9, extractedData: extracted, warnings: [] };
+          break;
+        }
+        case "coa":
+          result = { documentType: "coa", confidence: 0.9, extractedData: await extractCOA(textContent), warnings: [] };
+          break;
+        case "study":
+          result = { documentType: "study", confidence: 0.9, extractedData: await extractStudy(textContent), warnings: [] };
+          break;
+        default:
+          result = await extractFromDocument(textContent, file.name, context);
+      }
+    } catch (aiError) {
+      const aiMsg = aiError instanceof Error ? aiError.message : "AI extraction failed";
+      return NextResponse.json({
+        error: aiMsg,
+        details: `PDF text was extracted (${textContent.length} chars) but AI processing failed for ${file.name}`,
+      }, { status: 422 });
     }
 
     return NextResponse.json({
@@ -85,6 +92,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Upload processing failed";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: message, details: "Unexpected server error" }, { status: 500 });
   }
 }

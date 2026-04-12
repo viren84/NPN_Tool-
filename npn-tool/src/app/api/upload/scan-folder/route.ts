@@ -84,10 +84,22 @@ export async function POST(req: NextRequest) {
 
         // AI extraction
         console.log(`[Scan] AI extracting "${folder.name}" (${combinedText.length} chars)`);
-        const extracted = await extractLicencePDF(combinedText);
+        let extracted: Record<string, unknown>;
+        try {
+          extracted = await extractLicencePDF(combinedText);
+        } catch (aiErr) {
+          const aiMsg = aiErr instanceof Error ? aiErr.message : "AI extraction failed";
+          results.push({ folder: folder.name, status: "error", error: aiMsg });
+          continue;
+        }
+
+        if (extracted.error) {
+          results.push({ folder: folder.name, status: "error", error: String(extracted.error) });
+          continue;
+        }
 
         if (!extracted.licenceNumber && !extracted.productName) {
-          results.push({ folder: folder.name, status: "error", error: "AI could not extract data" });
+          results.push({ folder: folder.name, status: "error", error: "AI could not extract licence number or product name" });
           continue;
         }
 

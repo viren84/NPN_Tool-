@@ -45,7 +45,14 @@ export async function POST(req: NextRequest) {
 
       const buffer = Buffer.from(await file.arrayBuffer());
       console.log(`[Batch] Reading ${file.name} (${buffer.length} bytes)`);
-      const text = await extractTextFromPDF(buffer);
+      let text = "";
+      try {
+        text = await extractTextFromPDF(buffer);
+      } catch (pdfErr) {
+        console.error(`[Batch] PDF read error for ${file.name}:`, pdfErr instanceof Error ? pdfErr.message : pdfErr);
+        // Skip this file but continue processing others
+        continue;
+      }
       console.log(`[Batch] Extracted ${text.length} chars from ${file.name}`);
 
       if (!text || text.trim().length < 20) continue;
@@ -85,10 +92,15 @@ export async function POST(req: NextRequest) {
         console.log(`[Batch] AI extracting "${group.folderName}" (${combinedText.length} chars)`);
         const extracted = await extractLicencePDF(combinedText);
 
-        results.push({ folderName: group.folderName, fileCount: group.files.length, extractedData: extracted, status: "success" });
+        // Check if AI returned an error object instead of data
+        if (extracted.error) {
+          results.push({ folderName: group.folderName, fileCount: group.files.length, extractedData: {}, status: "error", error: String(extracted.error) });
+        } else {
+          results.push({ folderName: group.folderName, fileCount: group.files.length, extractedData: extracted, status: "success" });
+        }
       } catch (e) {
         console.error(`[Batch] Error for "${group.folderName}":`, e);
-        results.push({ folderName: group.folderName, fileCount: group.files.length, extractedData: {}, status: "error", error: e instanceof Error ? e.message : "Failed" });
+        results.push({ folderName: group.folderName, fileCount: group.files.length, extractedData: {}, status: "error", error: e instanceof Error ? e.message : "AI extraction failed" });
       }
     }
 

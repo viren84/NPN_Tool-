@@ -65,6 +65,13 @@ export default function LicencesPage() {
   const [detailUploading, setDetailUploading] = useState(false);
   const [detailUploadProgress, setDetailUploadProgress] = useState<{ current: number; total: number } | null>(null);
 
+  // Multi-select & bulk actions
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number } | null>(null);
+  const [showBulkConfirm, setShowBulkConfirm] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(setUser).catch(() => { window.location.href = "/login"; });
   }, []);
@@ -173,9 +180,10 @@ export default function LicencesPage() {
             }
           }
         } else {
-          results.push({ folder: folderName, status: "error", error: "Upload failed" });
+          const errData = await res.json().catch(() => ({}));
+          results.push({ folder: folderName, status: "error", error: errData.error || `Batch upload failed (${res.status})` });
         }
-      } catch { results.push({ folder: folderName, status: "error", error: "Network error" }); }
+      } catch (e) { results.push({ folder: folderName, status: "error", error: e instanceof Error ? e.message : "Network error" }); }
     }
     setScanResults(results);
 
@@ -218,11 +226,17 @@ export default function LicencesPage() {
       if (res.ok) {
         const data = await res.json();
         setScanResults(data.results || []);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setScanResults([{ folder: scanPath, status: "error", error: errData.error || `Scan failed (${res.status})` }]);
       }
-    } catch { /* ignore */ }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Network error — could not reach server";
+      setScanResults([{ folder: scanPath, status: "error", error: msg }]);
+    }
 
-    // AUTO: Run LNHPD sync after scan too
-    await fetch("/api/sync/lnhpd", { method: "POST" });
+    // AUTO: Run LNHPD sync after scan (non-blocking)
+    try { await fetch("/api/sync/lnhpd", { method: "POST" }); } catch { /* sync can retry later */ }
 
     setScanning(false);
     await load();
@@ -240,59 +254,94 @@ export default function LicencesPage() {
       try {
         const fd = new FormData(); fd.append("file", file); fd.append("context", "licence_pdf");
         const res = await fetch("/api/upload/process", { method: "POST", body: fd });
-        if (res.ok) {
-          const data = await res.json();
-          const ed = data.extractedData || {};
-          if (ed.licenceNumber || ed.productName) {
-            // Check duplicate
-            const existing = await fetch(`/api/licences?q=${ed.licenceNumber || ""}`).then(r => r.json());
-            if (ed.licenceNumber && existing.some((l: Licence) => l.licenceNumber === ed.licenceNumber)) {
-              results.push({ folder: file.name, status: "skipped", licenceNumber: ed.licenceNumber, productName: ed.productName, error: "NPN already exists" });
-            } else {
-              await fetch("/api/licences", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  licenceNumber: ed.licenceNumber || "", productName: ed.productName || file.name,
-                  productNameFr: ed.productNameFr || "", dosageForm: ed.dosageForm || "",
-                  routeOfAdmin: ed.routeOfAdmin || "", companyName: ed.companyName || "",
-                  companyCode: ed.companyCode || "", applicationClass: ed.applicationClass || "",
-                  submissionType: ed.submissionType || "", licenceDate: ed.licenceDate || "",
-                  medicinalIngredientsJson: JSON.stringify(ed.medicinalIngredients || []),
-                  nonMedIngredientsJson: JSON.stringify(ed.nonMedicinalIngredients || []),
-                  claimsJson: JSON.stringify(ed.claims || []),
-                  risksJson: JSON.stringify(ed.risks || []),
-                  dosesJson: JSON.stringify(ed.doses || []),
-                  importedFrom: "single_pdf",
-                }),
-              });
-              results.push({ folder: file.name, status: "success", licenceNumber: ed.licenceNumber, productName: ed.productName || file.name });
 
-              // Auto-attach PDF
-              const newLicences = await fetch(`/api/licences?q=${ed.licenceNumber || ""}`).then(r => r.json());
-              const newLic = newLicences.find((l: Licence) => l.licenceNumber === (ed.licenceNumber || ""));
-              if (newLic) {
-                const attFd = new FormData();
-                attFd.append("file", file); attFd.append("entityType", "licence"); attFd.append("entityId", newLic.id);
-                attFd.append("docCategory", file.name.toUpperCase().startsWith("IL") ? "il_letter" : "pl_licence");
-                await fetch("/api/attachments", { method: "POST", body: attFd });
-              }
-            }
-          } else {
-            results.push({ folder: file.name, status: "error", error: "Could not extract licence data" });
-          }
-        } else {
-          results.push({ folder: file.name, status: "error", error: "Upload failed" });
+        if (!res.ok) {
+          // Read the actual error message from the API
+          const errData = await res.json().catch(() => ({}));
+          results.push({ folder: file.name, status: "error", error: errData.error || `Upload failed (${res.status})` });
+          setScanResults([...results]);
+          continue;
         }
-      } catch {
-        results.push({ folder: file.name, status: "error", error: "Network error" });
+
+        const data = await res.json();
+        const ed = data.extractedData || {};
+
+        if (ed.error) {
+          // AI returned an error object instead of data
+          results.push({ folder: file.name, status: "error", error: String(ed.error) });
+          setScanResults([...results]);
+          continue;
+        }
+
+        if (!ed.licenceNumber && !ed.productName) {
+          results.push({ folder: file.name, status: "error", error: "AI could not find a licence number or product name in this PDF" });
+          setScanResults([...results]);
+          continue;
+        }
+
+        // Check duplicate
+        let existing: Licence[] = [];
+        try {
+          const dupRes = await fetch(`/api/licences?q=${ed.licenceNumber || ""}`);
+          if (dupRes.ok) existing = await dupRes.json();
+        } catch { /* continue even if duplicate check fails */ }
+
+        if (ed.licenceNumber && existing.some((l: Licence) => l.licenceNumber === ed.licenceNumber)) {
+          results.push({ folder: file.name, status: "skipped", licenceNumber: ed.licenceNumber, productName: ed.productName, error: "NPN already exists" });
+          setScanResults([...results]);
+          continue;
+        }
+
+        // Create licence
+        try {
+          await fetch("/api/licences", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              licenceNumber: ed.licenceNumber || "", productName: ed.productName || file.name,
+              productNameFr: ed.productNameFr || "", dosageForm: ed.dosageForm || "",
+              routeOfAdmin: ed.routeOfAdmin || "", companyName: ed.companyName || "",
+              companyCode: ed.companyCode || "", applicationClass: ed.applicationClass || "",
+              submissionType: ed.submissionType || "", licenceDate: ed.licenceDate || "",
+              medicinalIngredientsJson: JSON.stringify(ed.medicinalIngredients || []),
+              nonMedIngredientsJson: JSON.stringify(ed.nonMedicinalIngredients || []),
+              claimsJson: JSON.stringify(ed.claims || []),
+              risksJson: JSON.stringify(ed.risks || []),
+              dosesJson: JSON.stringify(ed.doses || []),
+              importedFrom: "single_pdf",
+            }),
+          });
+        } catch {
+          results.push({ folder: file.name, status: "error", error: "Licence extracted but failed to save to database" });
+          setScanResults([...results]);
+          continue;
+        }
+
+        results.push({ folder: file.name, status: "success", licenceNumber: ed.licenceNumber, productName: ed.productName || file.name });
+
+        // Auto-attach PDF (non-blocking — don't fail the whole import if this fails)
+        try {
+          const newLicences = await fetch(`/api/licences?q=${ed.licenceNumber || ""}`).then(r => r.json());
+          const newLic = newLicences.find((l: Licence) => l.licenceNumber === (ed.licenceNumber || ""));
+          if (newLic) {
+            const attFd = new FormData();
+            attFd.append("file", file); attFd.append("entityType", "licence"); attFd.append("entityId", newLic.id);
+            attFd.append("docCategory", file.name.toUpperCase().startsWith("IL") ? "il_letter" : "pl_licence");
+            await fetch("/api/attachments", { method: "POST", body: attFd });
+          }
+        } catch {
+          console.warn(`[Import] PDF attached but could not save attachment for ${file.name}`);
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Network error";
+        results.push({ folder: file.name, status: "error", error: msg });
       }
-      setScanResults([...results]); // Live update after each file
+      setScanResults([...results]);
     }
 
-    // Sync LNHPD once at end
+    // Sync LNHPD once at end (non-blocking)
     setUploadProgress(null);
     if (results.some(r => r.status === "success")) {
-      await fetch("/api/sync/lnhpd", { method: "POST" });
+      try { await fetch("/api/sync/lnhpd", { method: "POST" }); } catch { /* sync can retry later */ }
     }
     setScanning(false);
     await load();
@@ -319,10 +368,65 @@ export default function LicencesPage() {
     setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // ---- Multi-select helpers ----
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === licences.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(licences.map(l => l.id)));
+    }
+  };
+
+  // Keep select-all checkbox indeterminate state in sync
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = selectedIds.size > 0 && selectedIds.size < licences.length;
+    }
+  }, [selectedIds, licences.length]);
+
+  // Clear selection when search changes (results change)
+  useEffect(() => { setSelectedIds(new Set()); }, [search]);
+
+  // Bulk delete
+  const doBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    setBulkProgress({ current: 0, total: selectedIds.size });
+    try {
+      const res = await fetch("/api/licences/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBulkProgress({ current: data.deleted, total: selectedIds.size });
+        // Close detail panel if deleted item was selected
+        if (selected && selectedIds.has(selected.id)) {
+          setSelected(null); setSourceFiles([]); setAttachments([]);
+        }
+        setSelectedIds(new Set());
+        await load();
+      }
+    } catch { /* network error */ }
+    setBulkDeleting(false);
+    setBulkProgress(null);
+    setShowBulkConfirm(false);
+  };
+
   if (!user) return null;
 
   const activeCount = licences.filter(l => l.productStatus === "active").length;
   const archivedCount = licences.filter(l => l.productStatus !== "active").length;
+  const allSelected = licences.length > 0 && selectedIds.size === licences.length;
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -359,59 +463,103 @@ export default function LicencesPage() {
           placeholder="Search by NPN or product name..."
           className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm mb-4 bg-white" />
 
+        {/* Bulk Action Toolbar — appears when rows are selected */}
+        {selectedIds.size > 0 && (
+          <div className="mb-3 bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 flex items-center justify-between animate-in">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-semibold text-red-800">{selectedIds.size} selected</span>
+              <button onClick={() => setShowBulkConfirm(true)} disabled={bulkDeleting}
+                className="text-xs bg-red-600 text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-medium disabled:opacity-50 flex items-center gap-1.5">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                {bulkDeleting ? `Deleting ${bulkProgress?.current || 0}/${bulkProgress?.total || 0}...` : "Delete Selected"}
+              </button>
+              <a href={`/api/licences/export?format=csv&ids=${Array.from(selectedIds).join(",")}`} download
+                className="text-xs border border-gray-300 bg-white text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 font-medium">
+                Export Selected CSV
+              </a>
+            </div>
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-red-600 hover:text-red-800 font-medium">
+              Deselect All
+            </button>
+          </div>
+        )}
+
         {/* Table */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500 font-medium">
-                <th className="text-left px-4 py-3">NPN</th>
-                <th className="text-left px-4 py-3">Product</th>
-                <th className="text-left px-4 py-3">Form</th>
-                <th className="text-left px-4 py-3">Class</th>
-                <th className="text-left px-4 py-3">Status</th>
-                <th className="text-left px-4 py-3">Issued</th>
-                <th className="text-right px-4 py-3 w-28">Actions</th>
+              <tr className="border-b border-gray-100 bg-gray-50 text-xs text-gray-500 font-medium sticky top-0 z-10">
+                <th className="w-10 px-3 py-2.5">
+                  <input ref={selectAllRef} type="checkbox" checked={allSelected} onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer" />
+                </th>
+                <th className="text-left px-3 py-2.5">NPN</th>
+                <th className="text-left px-3 py-2.5">Product</th>
+                <th className="text-left px-3 py-2.5">Form</th>
+                <th className="text-left px-3 py-2.5">Class</th>
+                <th className="text-left px-3 py-2.5">Status</th>
+                <th className="text-left px-3 py-2.5">Issued</th>
+                <th className="text-right px-3 py-2.5 w-24">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr><td colSpan={7} className="px-4 py-12 text-center text-sm text-gray-400">Loading...</td></tr>
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-400">Loading...</td></tr>
               ) : licences.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-12 text-center">
-                  <p className="text-sm text-gray-400 mb-2">No licences yet</p>
-                  <button onClick={() => setShowImport(true)} className="text-sm text-red-600 hover:text-red-800 font-medium">Import from PDFs</button>
+                <tr><td colSpan={8} className="px-4 py-16 text-center">
+                  <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  <p className="text-sm text-gray-400 mb-2">No licences imported yet</p>
+                  <button onClick={() => setShowImport(true)} className="text-sm bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-medium">Import from PDFs</button>
                 </td></tr>
               ) : licences.map(lic => {
                 const isArchived = lic.productStatus !== "active";
+                const isChecked = selectedIds.has(lic.id);
+                const dotColor = lic.productStatus === "active" ? "text-green-500" : lic.productStatus === "cancelled" ? "text-red-500" : lic.productStatus === "suspended" ? "text-yellow-500" : "text-gray-400";
                 return (
                 <tr key={lic.id}
                   onClick={() => openDetail(lic)}
-                  className={`cursor-pointer transition-colors ${selected?.id === lic.id ? "bg-blue-50" : isArchived ? "opacity-50 hover:opacity-75" : "hover:bg-gray-50"}`}>
-                  <td className="px-4 py-3 text-sm font-mono text-blue-600 font-medium">{lic.licenceNumber}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900">
+                  className={`cursor-pointer transition-colors ${
+                    isChecked ? "bg-red-50/50" :
+                    selected?.id === lic.id ? "bg-blue-50" :
+                    isArchived ? "opacity-50 hover:opacity-75" :
+                    "hover:bg-gray-50"
+                  }`}>
+                  <td className="w-10 px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                    <input type="checkbox" checked={isChecked} onChange={() => toggleSelect(lic.id)}
+                      className="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer" />
+                  </td>
+                  <td className="px-3 py-2.5 text-sm font-mono text-blue-600 font-medium">{lic.licenceNumber}</td>
+                  <td className="px-3 py-2.5 text-sm text-gray-900">
                     {lic.productName}
                     {isArchived && <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">archived</span>}
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{lic.dosageForm}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{lic.applicationClass}</td>
-                  <td className="px-4 py-3"><span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[lic.productStatus] || "bg-gray-100 text-gray-500"}`}>{lic.productStatus}</span></td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{lic.licenceDate}</td>
-                  <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
-                    {confirmDel === lic.id ? (
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="flex gap-1">
-                          <button onClick={() => doDelete(lic.id)} disabled={deleting}
-                            className="text-xs bg-red-600 text-white px-2.5 py-1 rounded disabled:opacity-50">
-                            {deleting ? "Deleting..." : "Confirm"}
-                          </button>
-                          <button onClick={() => { setConfirmDel(null); setDeleteError(""); }} disabled={deleting}
-                            className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">Cancel</button>
+                  <td className="px-3 py-2.5 text-sm text-gray-600">{lic.dosageForm}</td>
+                  <td className="px-3 py-2.5 text-sm text-gray-600">{lic.applicationClass}</td>
+                  <td className="px-3 py-2.5">
+                    <span className={`text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${statusColors[lic.productStatus] || "bg-gray-100 text-gray-500"}`}>
+                      <span className={`${dotColor} text-[8px]`}>&#9679;</span>
+                      {lic.productStatus}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5 text-xs text-gray-500">{lic.licenceDate}</td>
+                  <td className="px-3 py-2.5 text-right" onClick={e => e.stopPropagation()}>
+                    {selectedIds.size === 0 && (
+                      confirmDel === lic.id ? (
+                        <div className="flex flex-col items-end gap-1">
+                          <div className="flex gap-1">
+                            <button onClick={() => doDelete(lic.id)} disabled={deleting}
+                              className="text-xs bg-red-600 text-white px-2.5 py-1 rounded disabled:opacity-50">
+                              {deleting ? "Deleting..." : "Confirm"}
+                            </button>
+                            <button onClick={() => { setConfirmDel(null); setDeleteError(""); }} disabled={deleting}
+                              className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">Cancel</button>
+                          </div>
+                          {deleteError && <p className="text-xs text-red-600 max-w-[150px] text-right">{deleteError}</p>}
                         </div>
-                        {deleteError && <p className="text-xs text-red-600 max-w-[150px] text-right">{deleteError}</p>}
-                      </div>
-                    ) : (
-                      <button onClick={() => doDelete(lic.id)}
-                        className="text-xs bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded hover:bg-red-100 font-medium">Delete</button>
+                      ) : (
+                        <button onClick={() => doDelete(lic.id)}
+                          className="text-xs bg-red-50 text-red-700 border border-red-200 px-2.5 py-1 rounded hover:bg-red-100 font-medium">Delete</button>
+                      )
                     )}
                   </td>
                 </tr>
@@ -766,6 +914,42 @@ export default function LicencesPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== BULK DELETE CONFIRMATION MODAL ========== */}
+      {showBulkConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => !bulkDeleting && setShowBulkConfirm(false)} />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="text-center">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Delete {selectedIds.size} licence{selectedIds.size > 1 ? "s" : ""}?</h3>
+              <p className="text-sm text-gray-500 mb-6">This will permanently remove the selected licences and their attachments. This cannot be undone.</p>
+
+              {bulkDeleting && bulkProgress && (
+                <div className="mb-4">
+                  <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
+                    <div className="bg-red-600 h-2 rounded-full transition-all" style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }} />
+                  </div>
+                  <p className="text-xs text-gray-500">Deleting {bulkProgress.current} of {bulkProgress.total}...</p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button onClick={() => setShowBulkConfirm(false)} disabled={bulkDeleting}
+                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                  Cancel
+                </button>
+                <button onClick={doBulkDelete} disabled={bulkDeleting}
+                  className="flex-1 py-2.5 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50">
+                  {bulkDeleting ? "Deleting..." : "Yes, Delete All"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

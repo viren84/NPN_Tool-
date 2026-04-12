@@ -1,5 +1,33 @@
 # Changelog — NPN Filing Tool
 
+## 2026-04-12 — Table Overhaul: Multi-Select, Bulk Actions, Design Polish
+
+### Added
+- **Row checkboxes** — select individual licences or "Select All" with header checkbox
+- **Bulk action toolbar** — appears when 1+ rows selected: "Delete Selected", "Export Selected CSV", "Deselect All"
+- **Bulk delete confirmation modal** — shows count, progress bar, cancel option
+- **Bulk delete API** — `POST /api/licences/bulk-delete` accepts `{ids: []}`, cleans up attachments + amendments
+- **Filtered CSV export** — `?ids=id1,id2` param on export API for selected-only export
+- **Status badge dots** — colored dot indicator (green/red/yellow/gray) before status text
+- **Improved empty state** — document icon + styled import CTA button instead of plain text
+- **Sticky table header** — stays visible when scrolling long lists
+- **Select-all indeterminate state** — checkbox shows dash when partially selected
+
+### Changed
+- Table padding tightened (`px-3 py-2.5`) for denser, more professional look
+- Per-row Delete button hides when any checkboxes are selected (bulk toolbar takes over)
+- Selected rows highlighted with subtle red tint (`bg-red-50/50`)
+- ColSpan updated from 7 to 8 to account for new checkbox column
+- Selection clears automatically when search query changes
+
+### Files Modified
+- `src/app/licences/page.tsx` — checkboxes, bulk toolbar, confirmation modal, design polish
+- `src/app/api/licences/bulk-delete/route.ts` — NEW: batch delete endpoint with cascade cleanup
+- `src/app/api/licences/export/route.ts` — added `?ids=` filter for selected-only export
+- `docs/CHANGELOG.md` — this entry
+
+---
+
 ## 2026-04-12 — Multi-PDF Upload, Drag & Drop, Attachment Viewer
 
 ### Added
