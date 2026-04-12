@@ -1,5 +1,30 @@
 # Changelog — NPN Filing Tool
 
+## 2026-04-12 — Multi-PDF Upload, Drag & Drop, Attachment Viewer
+
+### Added
+- **Multi-PDF file picker** — Ctrl+Click / Shift+Click to select multiple PDFs at once in Import modal
+- **Drag-and-drop upload zone** — drop PDF files directly onto the upload area with visual hover feedback
+- **File preview list before upload** — see all selected files with name, size, and individual remove (x) buttons
+- **"Clear all" button** — reset file selection before uploading
+- **Live upload progress** — "File 2 of 5 — filename.pdf" shown during processing
+- **Live scan results** — each file shows success/skipped/error as it finishes (not just at the end)
+- **View button on attachments** — opens PDF/images inline in a new browser tab without downloading
+- **Multi-file attachment upload** — detail panel "+ Upload" now accepts multiple files at once with progress counter
+- **Inline view API** — `GET /api/attachments/:id?inline=true` serves files with `Content-Disposition: inline`
+- **Activity tracking** — view vs download distinguished in audit log
+
+### Changed
+- Import modal tab renamed from "Single PDF" to "Upload PDFs"
+- Attachment action buttons restyled with borders for better visibility (View, Download, Remove)
+- Scanning progress spinner hidden on Tab 1 (replaced by inline progress in drop zone)
+
+### Files Modified
+- `src/app/api/attachments/[id]/route.ts` — added `?inline=true` query param support
+- `src/app/licences/page.tsx` — multi-file upload, drag-and-drop, file preview list, View button on attachments
+
+---
+
 ## 2026-04-12 (Day 2 — final session)
 
 ### Added

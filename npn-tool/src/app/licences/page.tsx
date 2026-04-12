@@ -54,6 +54,17 @@ export default function LicencesPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState("");
 
+  // Multi-PDF upload (Tab 1)
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; fileName: string } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const multiInputRef = useRef<HTMLInputElement>(null);
+
+  // Detail panel upload progress
+  const [detailUploading, setDetailUploading] = useState(false);
+  const [detailUploadProgress, setDetailUploadProgress] = useState<{ current: number; total: number } | null>(null);
+
   useEffect(() => {
     fetch("/api/auth/me").then(r => r.json()).then(setUser).catch(() => { window.location.href = "/login"; });
   }, []);
@@ -215,6 +226,97 @@ export default function LicencesPage() {
 
     setScanning(false);
     await load();
+  };
+
+  // ---- Multi-PDF processing (shared by Tab 1 file picker + drag-and-drop) ----
+  const processMultiplePdfs = async (files: File[]) => {
+    if (!files.length) return;
+    setScanning(true); setScanResults([]); setPendingFiles([]);
+    const results: ScanResult[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      setUploadProgress({ current: i + 1, total: files.length, fileName: file.name });
+      try {
+        const fd = new FormData(); fd.append("file", file); fd.append("context", "licence_pdf");
+        const res = await fetch("/api/upload/process", { method: "POST", body: fd });
+        if (res.ok) {
+          const data = await res.json();
+          const ed = data.extractedData || {};
+          if (ed.licenceNumber || ed.productName) {
+            // Check duplicate
+            const existing = await fetch(`/api/licences?q=${ed.licenceNumber || ""}`).then(r => r.json());
+            if (ed.licenceNumber && existing.some((l: Licence) => l.licenceNumber === ed.licenceNumber)) {
+              results.push({ folder: file.name, status: "skipped", licenceNumber: ed.licenceNumber, productName: ed.productName, error: "NPN already exists" });
+            } else {
+              await fetch("/api/licences", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  licenceNumber: ed.licenceNumber || "", productName: ed.productName || file.name,
+                  productNameFr: ed.productNameFr || "", dosageForm: ed.dosageForm || "",
+                  routeOfAdmin: ed.routeOfAdmin || "", companyName: ed.companyName || "",
+                  companyCode: ed.companyCode || "", applicationClass: ed.applicationClass || "",
+                  submissionType: ed.submissionType || "", licenceDate: ed.licenceDate || "",
+                  medicinalIngredientsJson: JSON.stringify(ed.medicinalIngredients || []),
+                  nonMedIngredientsJson: JSON.stringify(ed.nonMedicinalIngredients || []),
+                  claimsJson: JSON.stringify(ed.claims || []),
+                  risksJson: JSON.stringify(ed.risks || []),
+                  dosesJson: JSON.stringify(ed.doses || []),
+                  importedFrom: "single_pdf",
+                }),
+              });
+              results.push({ folder: file.name, status: "success", licenceNumber: ed.licenceNumber, productName: ed.productName || file.name });
+
+              // Auto-attach PDF
+              const newLicences = await fetch(`/api/licences?q=${ed.licenceNumber || ""}`).then(r => r.json());
+              const newLic = newLicences.find((l: Licence) => l.licenceNumber === (ed.licenceNumber || ""));
+              if (newLic) {
+                const attFd = new FormData();
+                attFd.append("file", file); attFd.append("entityType", "licence"); attFd.append("entityId", newLic.id);
+                attFd.append("docCategory", file.name.toUpperCase().startsWith("IL") ? "il_letter" : "pl_licence");
+                await fetch("/api/attachments", { method: "POST", body: attFd });
+              }
+            }
+          } else {
+            results.push({ folder: file.name, status: "error", error: "Could not extract licence data" });
+          }
+        } else {
+          results.push({ folder: file.name, status: "error", error: "Upload failed" });
+        }
+      } catch {
+        results.push({ folder: file.name, status: "error", error: "Network error" });
+      }
+      setScanResults([...results]); // Live update after each file
+    }
+
+    // Sync LNHPD once at end
+    setUploadProgress(null);
+    if (results.some(r => r.status === "success")) {
+      await fetch("/api/sync/lnhpd", { method: "POST" });
+    }
+    setScanning(false);
+    await load();
+  };
+
+  // Drag-and-drop handlers for Tab 1
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault(); e.stopPropagation(); setIsDragging(false);
+    const dropped = Array.from(e.dataTransfer.files).filter(f => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+    if (dropped.length) setPendingFiles(prev => [...prev, ...dropped]);
+  };
+
+  // Add files from file picker
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = Array.from(e.target.files || []).filter(f => f.name.toLowerCase().endsWith(".pdf"));
+    if (selected.length) setPendingFiles(prev => [...prev, ...selected]);
+    e.target.value = ""; // Reset so same files can be re-selected
+  };
+
+  // Remove a file from pending list
+  const removePendingFile = (index: number) => {
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   if (!user) return null;
@@ -440,14 +542,24 @@ export default function LicencesPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Attached Documents</h4>
-                <label className="text-xs bg-blue-600 text-white px-2.5 py-1 rounded hover:bg-blue-700 cursor-pointer">
-                  + Upload
-                  <input type="file" className="hidden" onChange={async (e) => {
-                    const file = e.target.files?.[0]; if (!file) return;
-                    const fd = new FormData(); fd.append("file", file); fd.append("entityType", "licence"); fd.append("entityId", sl.id);
-                    await fetch("/api/attachments", { method: "POST", body: fd });
+                <label className={`text-xs bg-blue-600 text-white px-2.5 py-1 rounded hover:bg-blue-700 cursor-pointer ${detailUploading ? "opacity-50 pointer-events-none" : ""}`}>
+                  {detailUploading ? (detailUploadProgress ? `Uploading ${detailUploadProgress.current}/${detailUploadProgress.total}...` : "Uploading...") : "+ Upload"}
+                  <input type="file" multiple className="hidden" onChange={async (e) => {
+                    const files = Array.from(e.target.files || []);
+                    if (!files.length) return;
+                    e.target.value = "";
+                    setDetailUploading(true);
+                    setDetailUploadProgress({ current: 0, total: files.length });
+                    for (let i = 0; i < files.length; i++) {
+                      setDetailUploadProgress({ current: i + 1, total: files.length });
+                      const fd = new FormData();
+                      fd.append("file", files[i]); fd.append("entityType", "licence"); fd.append("entityId", sl.id);
+                      await fetch("/api/attachments", { method: "POST", body: fd });
+                    }
                     const res = await fetch(`/api/attachments?entityType=licence&entityId=${sl.id}`);
                     if (res.ok) setAttachments(await res.json());
+                    setDetailUploading(false);
+                    setDetailUploadProgress(null);
                   }} />
                 </label>
               </div>
@@ -457,17 +569,22 @@ export default function LicencesPage() {
                 <div className="space-y-1.5">
                   {attachments.map(att => (
                     <div key={att.id} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded uppercase">{att.fileType}</span>
-                        <span className="text-sm text-gray-900">{att.fileName}</span>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded uppercase shrink-0">{att.fileType}</span>
+                        <span className="text-sm text-gray-900 truncate">{att.fileName}</span>
                       </div>
-                      <div className="flex gap-2">
-                        <a href={`/api/attachments/${att.id}`} download className="text-xs text-blue-600 hover:text-blue-800">Download</a>
+                      <div className="flex gap-1.5 shrink-0">
+                        {["pdf", "jpg", "jpeg", "png", "txt", "html", "csv"].includes(att.fileType) && (
+                          <a href={`/api/attachments/${att.id}?inline=true`} target="_blank" rel="noopener noreferrer"
+                            className="text-xs border border-gray-300 text-gray-700 px-2 py-1 rounded hover:bg-gray-100">View</a>
+                        )}
+                        <a href={`/api/attachments/${att.id}`} download
+                          className="text-xs text-blue-600 hover:text-blue-800 border border-blue-200 px-2 py-1 rounded hover:bg-blue-50">Download</a>
                         <button onClick={async () => {
                           await fetch(`/api/attachments/${att.id}`, { method: "DELETE" });
                           const res = await fetch(`/api/attachments?entityType=licence&entityId=${sl.id}`);
                           if (res.ok) setAttachments(await res.json());
-                        }} className="text-xs text-red-600 hover:text-red-800 font-medium">Remove</button>
+                        }} className="text-xs text-red-600 hover:text-red-800 font-medium border border-red-200 px-2 py-1 rounded hover:bg-red-50">Remove</button>
                       </div>
                     </div>
                   ))}
@@ -482,22 +599,22 @@ export default function LicencesPage() {
       {/* ========== IMPORT MODAL ========== */}
       {showImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/50" onClick={() => { setShowImport(false); setScanResults([]); }} />
+          <div className="fixed inset-0 bg-black/50" onClick={() => { setShowImport(false); setScanResults([]); setPendingFiles([]); }} />
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
             {/* Modal header */}
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center shrink-0">
               <h3 className="text-lg font-bold text-gray-900">Import Licences</h3>
-              <button onClick={() => { setShowImport(false); setScanResults([]); }} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+              <button onClick={() => { setShowImport(false); setScanResults([]); setPendingFiles([]); }} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
             </div>
 
             {/* Tabs */}
             <div className="px-6 pt-3 flex gap-4 border-b border-gray-100 shrink-0">
               {[
-                { key: "single" as const, label: "Single PDF" },
+                { key: "single" as const, label: "Upload PDFs" },
                 { key: "folder" as const, label: "Select Folder" },
                 { key: "scan" as const, label: "Scan Local Path" },
               ].map(t => (
-                <button key={t.key} onClick={() => { setImportTab(t.key); setScanResults([]); }}
+                <button key={t.key} onClick={() => { setImportTab(t.key); setScanResults([]); setPendingFiles([]); }}
                   className={`pb-3 text-sm font-medium border-b-2 ${importTab === t.key ? "border-red-600 text-red-700" : "border-transparent text-gray-500 hover:text-gray-700"}`}>
                   {t.label}
                 </button>
@@ -508,67 +625,79 @@ export default function LicencesPage() {
             <div className="flex-1 overflow-y-auto px-6 py-5">
               {importTab === "single" && (
                 <div>
-                  <p className="text-sm text-gray-600 mb-4">Upload a single IL (Issuance Letter) or PL (Product Licence) PDF. AI will extract all data automatically.</p>
-                  <label className="block w-full py-8 border-2 border-dashed border-blue-300 rounded-xl text-blue-600 hover:bg-blue-50 hover:border-blue-400 font-medium text-sm text-center cursor-pointer">
-                    {scanning ? "Processing..." : "Click to Select PDF"}
-                    <input type="file" accept=".pdf" className="hidden" onChange={async (e) => {
-                      const file = e.target.files?.[0]; if (!file) return;
-                      setScanning(true); setScanResults([]);
-                      const fd = new FormData(); fd.append("file", file); fd.append("context", "licence_pdf");
-                      const res = await fetch("/api/upload/process", { method: "POST", body: fd });
-                      if (res.ok) {
-                        const data = await res.json();
-                        const ed = data.extractedData || {};
-                        if (ed.licenceNumber || ed.productName) {
-                          // Check duplicate
-                          const existing = await fetch(`/api/licences?q=${ed.licenceNumber || ""}`).then(r => r.json());
-                          if (ed.licenceNumber && existing.some((l: Licence) => l.licenceNumber === ed.licenceNumber)) {
-                            setScanResults([{ folder: file.name, status: "skipped", licenceNumber: ed.licenceNumber, productName: ed.productName, error: "NPN already exists" }]);
-                          } else {
-                            await fetch("/api/licences", {
-                              method: "POST", headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                licenceNumber: ed.licenceNumber || "", productName: ed.productName || file.name,
-                                productNameFr: ed.productNameFr || "", dosageForm: ed.dosageForm || "",
-                                routeOfAdmin: ed.routeOfAdmin || "", companyName: ed.companyName || "",
-                                companyCode: ed.companyCode || "", applicationClass: ed.applicationClass || "",
-                                submissionType: ed.submissionType || "", licenceDate: ed.licenceDate || "",
-                                medicinalIngredientsJson: JSON.stringify(ed.medicinalIngredients || []),
-                                nonMedIngredientsJson: JSON.stringify(ed.nonMedicinalIngredients || []),
-                                claimsJson: JSON.stringify(ed.claims || []),
-                                risksJson: JSON.stringify(ed.risks || []),
-                                dosesJson: JSON.stringify(ed.doses || []),
-                                importedFrom: "single_pdf",
-                              }),
-                            });
-                            setScanResults([{ folder: file.name, status: "success", licenceNumber: ed.licenceNumber, productName: ed.productName || file.name }]);
+                  <p className="text-sm text-gray-600 mb-3">Upload one or more IL / PL PDF files. Select multiple with Ctrl+Click or drag and drop.</p>
 
-                            // AUTO: Attach the uploaded PDF to the licence
-                            const newLicences = await fetch(`/api/licences?q=${ed.licenceNumber || ""}`).then(r => r.json());
-                            const newLic = newLicences.find((l: Licence) => l.licenceNumber === (ed.licenceNumber || ""));
-                            if (newLic) {
-                              const attFd = new FormData();
-                              attFd.append("file", file);
-                              attFd.append("entityType", "licence");
-                              attFd.append("entityId", newLic.id);
-                              attFd.append("docCategory", file.name.toUpperCase().startsWith("IL") ? "il_letter" : "pl_licence");
-                              await fetch("/api/attachments", { method: "POST", body: attFd });
-                            }
+                  {/* Hidden file input */}
+                  <input ref={multiInputRef} type="file" accept=".pdf" multiple className="hidden" onChange={handleFileSelect} />
 
-                            // AUTO: Run LNHPD sync
-                            await fetch("/api/sync/lnhpd", { method: "POST" });
-                            await load();
-                          }
-                        } else {
-                          setScanResults([{ folder: file.name, status: "error", error: "Could not extract licence data from this PDF" }]);
-                        }
-                      } else {
-                        setScanResults([{ folder: file.name, status: "error", error: "Upload failed" }]);
-                      }
-                      setScanning(false);
-                    }} />
-                  </label>
-                  <p className="text-xs text-gray-400 mt-2">Supports Health Canada IL and PL PDF files. You can also upload multiple files by selecting a folder.</p>
+                  {/* Drag-and-drop zone */}
+                  <div
+                    ref={dropRef}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => !scanning && multiInputRef.current?.click()}
+                    className={`w-full py-8 border-2 border-dashed rounded-xl text-center cursor-pointer transition-colors ${
+                      isDragging ? "border-blue-500 bg-blue-100" :
+                      scanning ? "border-gray-300 bg-gray-50 cursor-not-allowed" :
+                      "border-blue-300 hover:bg-blue-50 hover:border-blue-400"
+                    }`}
+                  >
+                    {scanning ? (
+                      <div>
+                        <div className="animate-spin w-6 h-6 border-3 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">Processing...</p>
+                        {uploadProgress && (
+                          <p className="text-xs text-blue-600 mt-1 font-medium">
+                            File {uploadProgress.current} of {uploadProgress.total} — {uploadProgress.fileName}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div>
+                        <svg className="w-8 h-8 mx-auto mb-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                        </svg>
+                        <p className="text-sm font-medium text-blue-600">
+                          {isDragging ? "Drop PDF files here" : "Click to select PDFs or drag & drop"}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">PDF files only, 20MB max each</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Pending files list — shown before upload starts */}
+                  {pendingFiles.length > 0 && !scanning && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-xs font-semibold text-gray-700">{pendingFiles.length} file{pendingFiles.length > 1 ? "s" : ""} selected</h4>
+                        <button onClick={() => setPendingFiles([])} className="text-xs text-gray-400 hover:text-gray-600">Clear all</button>
+                      </div>
+                      <div className="max-h-40 overflow-y-auto space-y-1 mb-3">
+                        {pendingFiles.map((f, i) => (
+                          <div key={i} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-mono uppercase shrink-0">PDF</span>
+                              <span className="text-sm text-gray-900 truncate">{f.name}</span>
+                              <span className="text-xs text-gray-400 shrink-0">{Math.round(f.size / 1024)}KB</span>
+                            </div>
+                            <button onClick={() => removePendingFile(i)} className="text-gray-400 hover:text-red-500 text-sm ml-2 shrink-0">&times;</button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => processMultiplePdfs(pendingFiles)}
+                        className="w-full py-2.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 font-medium flex items-center justify-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                        Upload & Extract {pendingFiles.length} PDF{pendingFiles.length > 1 ? "s" : ""}
+                      </button>
+                    </div>
+                  )}
+
+                  {!pendingFiles.length && !scanning && scanResults.length === 0 && (
+                    <p className="text-xs text-gray-400 mt-2">Supports Health Canada IL and PL PDF files. Select multiple files at once.</p>
+                  )}
                 </div>
               )}
 
@@ -601,7 +730,7 @@ export default function LicencesPage() {
               )}
 
               {/* Progress / Results */}
-              {scanning && (
+              {scanning && importTab !== "single" && (
                 <div className="mt-6 text-center">
                   <div className="animate-spin w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full mx-auto mb-3" />
                   <p className="text-sm text-gray-600">Reading PDFs and extracting data with AI...</p>
