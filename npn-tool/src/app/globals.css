@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  color-scheme: light;
+}
+
+body {
+  background: #f9fafb !important;
+  color: #171717 !important;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Force light mode everywhere — survives Dark Reader */
+html {
+  color-scheme: light !important;
+  background: #f9fafb !important;
+}
+
+/* Force white backgrounds on all key elements */
+html, body, main, aside, nav,
+div[class*="bg-white"],
+div[class*="bg-gray-50"],
+table, thead, tbody, tr, td, th,
+input, select, textarea, button,
+[class*="rounded-xl"],
+[class*="rounded-lg"] {
+  color-scheme: light !important;
+}
+
+/* Detail panel — always white */
+div[class*="fixed top-0 right-0"] {
+  background-color: #ffffff !important;
+  color: #171717 !important;
+}
+
+/* Modal — always white */
+div[class*="bg-white"][class*="rounded-2xl"] {
+  background-color: #ffffff !important;
+  color: #171717 !important;
+}
+
+/* Table rows — always light */
+tbody tr {
+  background-color: #ffffff !important;
+}
+tbody tr:hover {
+  background-color: #f9fafb !important;
+}
+
+/* Sidebar — always white */
+aside {
+  background-color: #ffffff !important;
+  color: #171717 !important;
+}
+
+/* Inputs — always white */
+input, select, textarea {
+  background-color: #ffffff !important;
+  color: #171717 !important;
+  border-color: #d1d5db !important;
+}
+
+/* Responsive sidebar */
+@media (max-width: 1024px) {
+  .ml-64 { margin-left: 0 !important; }
+}
+
+/* Document preview scrollable */
+.prose { max-height: 70vh; overflow-y: auto; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f1f1f1; }
+::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+
+/* Hide Next.js dev error overlay — Dark Reader causes hydration mismatch */
+nextjs-portal { display: none !important; }
+[data-nextjs-dialog-overlay] { display: none !important; }
+[data-nextjs-dialog] { display: none !important; }

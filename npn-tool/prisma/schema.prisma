@@ -1,0 +1,689 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ================================================================
+// USERS & AUTH
+// ================================================================
+
+model User {
+  id        String   @id @default(uuid())
+  username  String   @unique
+  password  String
+  name      String
+  email     String?
+  role      String   @default("editor")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  applications      Application[]
+  auditLogs         AuditLog[]
+  uploads           Attachment[] @relation("Uploads")
+  activities        ActivityLog[] @relation("Activities")
+  documentApprovals GeneratedDocument[] @relation("ApprovedBy")
+  ingredientSubmissions IngredientSubmission[]
+}
+
+// ================================================================
+// COMPANY PROFILE
+// ================================================================
+
+model CompanyProfile {
+  id                String  @id @default(uuid())
+  legalName         String  @default("UV International Traders Inc")
+  dbaName           String  @default("Wellnessextract")
+  companyCode       String  @default("45028")
+  seniorOfficial    String  @default("Virender Dass")
+  seniorTitle       String  @default("CEO")
+  address           String  @default("")
+  city              String  @default("")
+  province          String  @default("BC")
+  postalCode        String  @default("V2T 6H4")
+  country           String  @default("Canada")
+  phone             String  @default("")
+  email             String  @default("")
+  siteLicenceNumber String  @default("")
+  qapName           String  @default("")
+  qapQualifications String  @default("")
+  epostRegistered   Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ================================================================
+// FACILITIES (Warehouses, 3PLs, Foreign Sites)
+// ================================================================
+
+model Facility {
+  id                String   @id @default(uuid())
+  facilityType      String   @default("warehouse") // warehouse, 3pl, foreign_manufacturer, foreign_packager, office
+  name              String
+  address           String   @default("")
+  city              String   @default("")
+  province          String   @default("")
+  postalCode        String   @default("")
+  country           String   @default("Canada")
+  phone             String   @default("")
+  email             String   @default("")
+  // Site licence
+  siteLicenceNumber String   @default("")
+  siteLicenceExpiry String   @default("")
+  siteLicenceStatus String   @default("") // active, expired, pending, not_required
+  // Activities
+  activities        String   @default("[]") // JSON: ["manufacturing", "packaging", "labelling", "importing", "storing"]
+  // GMP
+  gmpCertified      Boolean  @default(false)
+  gmpCertExpiry     String   @default("")
+  gmpAuditDate      String   @default("")
+  // Foreign site
+  fsrn              String   @default("") // Foreign Site Reference Number
+  mraPicsCert       String   @default("") // MRA/PIC/S certificate ref
+  // Manager
+  managerName       String   @default("")
+  managerPhone      String   @default("")
+  managerEmail      String   @default("")
+  managerRole       String   @default("")
+  // Notes
+  notes             String   @default("")
+  isActive          Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ================================================================
+// TEAM MEMBERS
+// ================================================================
+
+model TeamMember {
+  id            String   @id @default(uuid())
+  name          String
+  role          String   @default("") // ceo, regulatory, warehouse_manager, qap, hr, customer_service, compliance
+  title         String   @default("") // formal title
+  department    String   @default("")
+  phone         String   @default("")
+  phoneExt      String   @default("")
+  email         String   @default("")
+  facilityId    String   @default("") // which facility they work at
+  // Regulatory roles
+  isQAP         Boolean  @default(false)
+  isSeniorOfficial Boolean @default(false)
+  isAuthorizedSignatory Boolean @default(false)
+  isDPA         Boolean  @default(false) // Designated Party Authorization
+  // Contact for HC
+  isHCContact   Boolean  @default(false) // Primary contact for Health Canada
+  // Notes
+  notes         String   @default("")
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ================================================================
+// INGREDIENT KNOWLEDGE BASE
+// ================================================================
+
+model Ingredient {
+  id              String   @id @default(uuid())
+  nhpidId         String?  @unique
+  nhpidName       String   @default("")
+  ingredientType  String   @default("medicinal") // medicinal, non_medicinal, homeopathic
+  category        String   @default("") // Chemical Substance, Organism Substance, etc.
+  subCategory     String   @default("")
+  casNumber       String   @default("")
+  unii            String   @default("")
+  schedule1       Boolean  @default(false)
+  status          String   @default("active") // active, archived, pending_review, restricted
+  // Names
+  properNameEn    String   @default("")
+  properNameFr    String   @default("")
+  commonNameEn    String   @default("")
+  commonNameFr    String   @default("")
+  scientificName  String   @default("")
+  synonyms        String   @default("[]") // JSON array
+  // Chemical
+  molecularFormula  String @default("")
+  molecularWeight   Float?
+  chemicalClass     String @default("")
+  chemicalSubclass  String @default("")
+  smiles            String @default("")
+  inchi             String @default("")
+  physicalForm      String @default("")
+  solubility        String @default("")
+  storageConditions String @default("")
+  // Botanical/Organism
+  organismType      String @default("") // plant, animal, fungus, algae, bacteria, mineral
+  genus             String @default("")
+  species           String @default("")
+  family            String @default("")
+  authorCitation    String @default("")
+  partsUsed         String @default("[]") // JSON array
+  preparationTypes  String @default("[]") // JSON array
+  geographicalOrigin String @default("")
+  // Regulatory (multi-jurisdiction JSON)
+  regulatoryStatusJson String @default("{}") // { canada: {}, usa: {}, eu: {}, australia: {} }
+  grasStatus        String @default("") // none, self_affirmed, fda_notified
+  // Safety summary
+  safetyDataJson    String @default("[]") // JSON array of safety items
+  // Dosing ranges
+  dosingDataJson    String @default("[]") // JSON array of dose ranges
+  // NMI purposes
+  nmiPurposes       String @default("[]") // JSON array for non-medicinal
+  allergenFlag      Boolean @default(false)
+  allergenType      String @default("")
+  // Supplier info
+  suppliersJson     String @default("[]") // JSON array of supplier records
+  // Meta
+  importedFrom      String @default("") // nhpid, manual, csv, lnhpd
+  notes             String @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  monographLinks    IngredientMonographLink[]
+}
+
+// ================================================================
+// MONOGRAPHS
+// ================================================================
+
+model Monograph {
+  id                    String   @id @default(uuid())
+  nhpidId               String   @unique
+  name                  String
+  nameFr                String   @default("")
+  monographType         String   @default("single") // single, combination, product_category
+  version               String   @default("")
+  effectiveDate         String   @default("")
+  lastRevised           String   @default("")
+  submissionClass       String   @default("") // class_I, class_II
+  status                String   @default("current") // current, archived, draft
+  // Structured data (JSON)
+  claimsJson            String   @default("[]") // [{textEn, textFr, isMandatory}]
+  doseRangesJson        String   @default("{}") // {population: {min, max, unit}}
+  specificationsJson    String   @default("{}") // quality specs
+  cautionsJson          String   @default("[]")
+  warningsJson          String   @default("[]")
+  contraindicationsJson String   @default("[]")
+  adverseReactionsJson  String   @default("[]")
+  sourceRequirements    String   @default("") // allowed sources
+  preparationRequirements String @default("") // allowed preparations
+  // Files
+  pdfPath               String   @default("")
+  pdfUrl                String   @default("")
+  // Meta
+  lastUpdated           DateTime @default(now())
+  createdAt             DateTime @default(now())
+
+  ingredientLinks       IngredientMonographLink[]
+}
+
+model IngredientMonographLink {
+  id            String     @id @default(uuid())
+  ingredientId  String
+  ingredient    Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+  monographId   String
+  monograph     Monograph  @relation(fields: [monographId], references: [id], onDelete: Cascade)
+  isCompliant   Boolean    @default(false)
+  notes         String     @default("")
+  createdAt     DateTime   @default(now())
+}
+
+// ================================================================
+// PRODUCT LICENCES (ACTIVE NPN MANAGEMENT)
+// ================================================================
+
+model ProductLicence {
+  id                    String   @id @default(uuid())
+  lnhpdId               String?  @unique
+  licenceNumber         String   // 8-digit NPN (not unique — archived duplicates allowed)
+  licenceType           String   @default("npn") // npn, din_hm
+  productName           String
+  productNameFr         String   @default("")
+  dosageForm            String   @default("")
+  routeOfAdmin          String   @default("")
+  companyCode           String   @default("")
+  companyName           String   @default("")
+  applicationClass      String   @default("")
+  submissionType        String   @default("") // Compendial, Traditional, Non-traditional
+  attestedMonograph     Boolean  @default(false)
+  hypothetical          Boolean  @default(false)
+  // Dates
+  licenceDate           String   @default("")
+  revisedDate           String   @default("")
+  receiptDate           String   @default("")
+  // Status
+  productStatus         String   @default("active") // active, non_active, cancelled, suspended
+  renewalDate           String   @default("")
+  renewalStatus         String   @default("current") // current, pending, overdue
+  // Internal
+  internalStatus        String   @default("active") // active, amendment_pending, needs_attention
+  assignedTo            String   @default("")
+  priority              String   @default("medium")
+  // Structured data
+  medicinalIngredientsJson String @default("[]") // full MI data from LNHPD
+  nonMedIngredientsJson    String @default("[]")
+  claimsJson               String @default("[]")
+  risksJson                String @default("[]")
+  dosesJson                String @default("[]")
+  routesJson               String @default("[]")
+  // Files
+  licencePdfPath        String   @default("")
+  labelTextPath         String   @default("")
+  // Meta
+  importedFrom          String   @default("") // lnhpd, manual, pdf, csv
+  notes                 String   @default("")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  amendments            LicenceAmendment[]
+}
+
+model LicenceAmendment {
+  id              String   @id @default(uuid())
+  licenceId       String
+  licence         ProductLicence @relation(fields: [licenceId], references: [id], onDelete: Cascade)
+  amendmentType   String   // notification, amendment, new_pla_required
+  changeType      String   @default("") // ingredient_change, claim_change, label_change, site_change
+  description     String
+  status          String   @default("draft") // draft, submitted, under_review, approved, rejected
+  submissionDate  String   @default("")
+  approvalDate    String   @default("")
+  documentPath    String   @default("")
+  notes           String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ================================================================
+// INGREDIENT SUBMISSIONS (NHPID NEW INGREDIENT)
+// ================================================================
+
+model IngredientSubmission {
+  id                  String   @id @default(uuid())
+  status              String   @default("draft") // draft, submitted, under_review, approved, rejected
+  // Ingredient identity
+  ingredientName      String
+  scientificName      String   @default("")
+  casNumber           String   @default("")
+  molecularFormula    String   @default("")
+  molecularWeight     Float?
+  // Classification
+  classification      String   @default("medicinal") // medicinal, non_medicinal
+  schedule            String   @default("") // schedule_1_plant, schedule_1_vitamin, etc.
+  // Source
+  sourceOrganism      String   @default("")
+  sourceOrganismLatin String   @default("")
+  sourcePart          String   @default("")
+  extractionMethod    String   @default("")
+  // Proposed names
+  proposedProperName  String   @default("")
+  proposedCommonName  String   @default("")
+  // Regulatory
+  grasStatus          String   @default("") // none, self_affirmed, fda_notified
+  otherJurisdictions  String   @default("{}") // JSON: {usa: "", eu: "", australia: ""}
+  // Evidence
+  evidencePackageJson String   @default("[]") // JSON array of studies
+  // Precedent
+  precedentIngredientsJson String @default("[]") // JSON array of similar NHPID ingredients
+  // NHPID submission tracking
+  nhpidRequestDate    String   @default("")
+  nhpidExpectedDate   String   @default("")
+  nhpidApprovalDate   String   @default("")
+  nhpidId             String   @default("") // assigned after approval
+  // Meta
+  notes               String   @default("")
+  createdById         String
+  createdBy           User     @relation(fields: [createdById], references: [id])
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  productStrategies   ProductStrategy[]
+}
+
+model ProductStrategy {
+  id                    String   @id @default(uuid())
+  submissionId          String
+  submission            IngredientSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  productName           String
+  productType           String   @default("single") // single, combination
+  applicationClass      String   @default("III")
+  dosageForm            String   @default("")
+  dosageAmount          String   @default("")
+  // Combination details
+  combinationIngredients String  @default("[]") // JSON array
+  proposedClaims        String   @default("[]") // JSON array
+  targetTimeline        String   @default("")
+  status                String   @default("planned") // planned, nhpid_pending, ready_to_file, filed
+  // Link to NPN application (after creation)
+  applicationId         String?
+  notes                 String   @default("")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ================================================================
+// APPLICATIONS (PLA)
+// ================================================================
+
+model Application {
+  id                String   @id @default(uuid())
+  productName       String
+  brandName         String   @default("")
+  applicationClass  String   @default("I")
+  applicationType   String   @default("Compendial")
+  status            String   @default("draft")
+  dosageForm        String   @default("")
+  routeOfAdmin      String   @default("")
+  trackingNumber    String   @default("")
+  productConcept    String   @default("")
+  classReasoning    String   @default("")
+  animalTissue      Boolean  @default(false)
+  sterile           Boolean  @default(false)
+  durationOfUse     String   @default("")
+  version           Int      @default(1)
+  createdById       String
+  createdBy         User     @relation(fields: [createdById], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  medicinalIngredients    MedicinalIngredient[]
+  nonMedicinalIngredients NonMedicinalIngredient[]
+  claims                  Claim[]
+  dosageGroups            DosageGroup[]
+  riskInfos               RiskInfo[]
+  documents               GeneratedDocument[]
+  supplierCOAs            SupplierCOA[]
+  lnhpdPrecedents         LNHPDPrecedent[]
+}
+
+// ================================================================
+// APPLICATION INGREDIENTS
+// ================================================================
+
+model MedicinalIngredient {
+  id                String   @id @default(uuid())
+  applicationId     String
+  application       Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  sortOrder         Int      @default(0)
+  nhpidName         String   @default("")
+  properName        String   @default("")
+  commonName        String   @default("")
+  scientificName    String   @default("")
+  casNumber         String   @default("")
+  quantity          Float    @default(0)
+  quantityUnit      String   @default("mg")
+  potency           Float?
+  potencyUnit       String   @default("")
+  standardization   String   @default("")
+  sourceMaterial    String   @default("")
+  organismPart      String   @default("")
+  extractType       String   @default("")
+  extractSolvent    String   @default("")
+  extractRatio      String   @default("")
+  driedHerbEquiv    String   @default("")
+  syntheticFlag     Boolean  @default(false)
+  nanomaterialFlag  Boolean  @default(false)
+  animalTissueFlag  Boolean  @default(false)
+  animalSource      String   @default("")
+  monographId       String?
+  monographName     String   @default("")
+  monographCompliant Boolean @default(false)
+  supplierName      String   @default("")
+  coaReference      String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  supplierCOAs      SupplierCOA[]
+}
+
+model NonMedicinalIngredient {
+  id               String   @id @default(uuid())
+  applicationId    String
+  application      Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  sortOrder        Int      @default(0)
+  ingredientName   String
+  purpose          String   @default("")
+  quantity         Float?
+  unit             String   @default("")
+  animalTissueFlag Boolean  @default(false)
+  nanomaterialFlag Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ================================================================
+// APPLICATION CLAIMS, DOSAGE, RISK
+// ================================================================
+
+model Claim {
+  id                  String   @id @default(uuid())
+  applicationId       String
+  application         Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  sortOrder           Int      @default(0)
+  claimTextEn         String
+  claimTextFr         String   @default("")
+  fromMonograph       Boolean  @default(false)
+  monographName       String   @default("")
+  linkedIngredientIds String   @default("[]")
+  claimType           String   @default("health")
+  selected            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model DosageGroup {
+  id              String   @id @default(uuid())
+  applicationId   String
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  sortOrder       Int      @default(0)
+  population      String
+  ageRangeMin     Int?
+  ageRangeMax     Int?
+  minDose         Float?
+  maxDose         Float?
+  doseUnit        String   @default("")
+  frequency       String   @default("")
+  directions      String   @default("")
+  withFood        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model RiskInfo {
+  id              String   @id @default(uuid())
+  applicationId   String
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  sortOrder       Int      @default(0)
+  riskType        String
+  textEn          String
+  textFr          String   @default("")
+  fromMonograph   Boolean  @default(false)
+  monographName   String   @default("")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ================================================================
+// SUPPLIER COAs
+// ================================================================
+
+model SupplierCOA {
+  id               String  @id @default(uuid())
+  applicationId    String
+  application      Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  ingredientId     String?
+  ingredient       MedicinalIngredient? @relation(fields: [ingredientId], references: [id])
+  supplierName     String  @default("")
+  parsedDataJson   String  @default("{}")
+  originalFilePath String  @default("")
+  fileName         String  @default("")
+  fileSize         Int     @default(0)
+  createdAt        DateTime @default(now())
+}
+
+// ================================================================
+// GENERATED DOCUMENTS
+// ================================================================
+
+model GeneratedDocument {
+  id              String    @id @default(uuid())
+  applicationId   String
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  documentType    String
+  status          String    @default("pending")
+  content         String    @default("")
+  filePath        String    @default("")
+  version         Int       @default(1)
+  approvedById    String?
+  approvedBy      User?     @relation("ApprovedBy", fields: [approvedById], references: [id])
+  approvedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+// ================================================================
+// LNHPD PRECEDENTS
+// ================================================================
+
+model LNHPDPrecedent {
+  id                   String   @id @default(uuid())
+  applicationId        String
+  application          Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  lnhpdId              String
+  licenceNumber        String   @default("")
+  productName          String   @default("")
+  relevanceScore       Float    @default(0)
+  ingredientsMatchJson String   @default("{}")
+  createdAt            DateTime @default(now())
+}
+
+// ================================================================
+// EXISTING PRODUCTS (IMPORTED)
+// ================================================================
+
+model ExistingProduct {
+  id               String   @id @default(uuid())
+  npnNumber        String   @unique
+  productName      String
+  licenceStatus    String   @default("active")
+  applicationClass String   @default("")
+  licenceNumber    String   @default("")
+  importedFrom     String   @default("")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ================================================================
+// AUDIT LOG
+// ================================================================
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  entityType String
+  entityId   String
+  details    String   @default("")
+  changes    String   @default("{}")
+  createdAt  DateTime @default(now())
+}
+
+// ================================================================
+// APP SETTINGS
+// ================================================================
+
+model AppSettings {
+  id                 String    @id @default("default")
+  claudeApiKey       String    @default("")
+  nhpidLastRefresh   DateTime?
+  lnhpdLastRefresh   DateTime?
+  autoRefreshEnabled Boolean   @default(true)
+  exportPath         String    @default("")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+// ================================================================
+// FAQ CACHE
+// ================================================================
+
+model FaqCache {
+  id        String   @id @default(uuid())
+  question  String   @unique
+  answer    String
+  category  String   @default("general")
+  createdAt DateTime @default(now())
+}
+
+// ================================================================
+// DOCUMENT ATTACHMENTS (linked to any entity)
+// ================================================================
+
+model Attachment {
+  id            String   @id @default(uuid())
+  // What this is attached to
+  entityType    String   // licence, application, ingredient, submission
+  entityId      String   // ID of the parent entity
+  // File info
+  fileName      String
+  fileType      String   @default("") // pdf, xlsx, docx, jpg, etc.
+  fileSize      Int      @default(0) // bytes
+  filePath      String   // local file path
+  // Classification
+  docCategory   String   @default("other") // coa, supplier_spec, hc_letter, il_letter, pl_licence, invoice, label, study, other
+  description   String   @default("")
+  tags          String   @default("[]") // JSON array of tags
+  // Meta
+  uploadedById  String
+  uploadedBy    User     @relation("Uploads", fields: [uploadedById], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ================================================================
+// ACTIVITY LOG (granular tracking — views, clicks, downloads)
+// ================================================================
+
+model ActivityLog {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation("Activities", fields: [userId], references: [id])
+  // What happened
+  action        String   // view, click, download, upload, search, login, logout, export
+  // What was acted on
+  entityType    String   @default("") // licence, application, ingredient, document, page
+  entityId      String   @default("")
+  entityName    String   @default("") // human-readable name for reports
+  // Context
+  pagePath      String   @default("") // URL path
+  details       String   @default("") // additional context
+  ipAddress     String   @default("")
+  userAgent     String   @default("")
+  // Timestamp
+  createdAt     DateTime @default(now())
+}
+
+// ================================================================
+// AUDIT REPORTS
+// ================================================================
+
+model AuditReport {
+  id            String   @id @default(uuid())
+  reportType    String   @default("monthly") // monthly, weekly, custom
+  periodStart   DateTime
+  periodEnd     DateTime
+  // Report content
+  summaryJson   String   @default("{}") // {totalLogins, totalViews, totalDownloads, etc.}
+  detailsJson   String   @default("[]") // full activity breakdown
+  userBreakdown String   @default("{}") // per-user activity counts
+  // Status
+  status        String   @default("generated") // generated, reviewed, archived
+  generatedAt   DateTime @default(now())
+  reviewedById  String?
+  reviewedAt    DateTime?
+}

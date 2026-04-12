@@ -1,0 +1,52 @@
+-- CreateTable
+CREATE TABLE "Facility" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "facilityType" TEXT NOT NULL DEFAULT 'warehouse',
+    "name" TEXT NOT NULL,
+    "address" TEXT NOT NULL DEFAULT '',
+    "city" TEXT NOT NULL DEFAULT '',
+    "province" TEXT NOT NULL DEFAULT '',
+    "postalCode" TEXT NOT NULL DEFAULT '',
+    "country" TEXT NOT NULL DEFAULT 'Canada',
+    "phone" TEXT NOT NULL DEFAULT '',
+    "email" TEXT NOT NULL DEFAULT '',
+    "siteLicenceNumber" TEXT NOT NULL DEFAULT '',
+    "siteLicenceExpiry" TEXT NOT NULL DEFAULT '',
+    "siteLicenceStatus" TEXT NOT NULL DEFAULT '',
+    "activities" TEXT NOT NULL DEFAULT '[]',
+    "gmpCertified" BOOLEAN NOT NULL DEFAULT false,
+    "gmpCertExpiry" TEXT NOT NULL DEFAULT '',
+    "gmpAuditDate" TEXT NOT NULL DEFAULT '',
+    "fsrn" TEXT NOT NULL DEFAULT '',
+    "mraPicsCert" TEXT NOT NULL DEFAULT '',
+    "managerName" TEXT NOT NULL DEFAULT '',
+    "managerPhone" TEXT NOT NULL DEFAULT '',
+    "managerEmail" TEXT NOT NULL DEFAULT '',
+    "managerRole" TEXT NOT NULL DEFAULT '',
+    "notes" TEXT NOT NULL DEFAULT '',
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);
+
+-- CreateTable
+CREATE TABLE "TeamMember" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "name" TEXT NOT NULL,
+    "role" TEXT NOT NULL DEFAULT '',
+    "title" TEXT NOT NULL DEFAULT '',
+    "department" TEXT NOT NULL DEFAULT '',
+    "phone" TEXT NOT NULL DEFAULT '',
+    "phoneExt" TEXT NOT NULL DEFAULT '',
+    "email" TEXT NOT NULL DEFAULT '',
+    "facilityId" TEXT NOT NULL DEFAULT '',
+    "isQAP" BOOLEAN NOT NULL DEFAULT false,
+    "isSeniorOfficial" BOOLEAN NOT NULL DEFAULT false,
+    "isAuthorizedSignatory" BOOLEAN NOT NULL DEFAULT false,
+    "isDPA" BOOLEAN NOT NULL DEFAULT false,
+    "isHCContact" BOOLEAN NOT NULL DEFAULT false,
+    "notes" TEXT NOT NULL DEFAULT '',
+    "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" DATETIME NOT NULL
+);

@@ -1,0 +1,113 @@
+# Changelog — NPN Filing Tool
+
+## 2026-04-12 (Day 2 — final session)
+
+### Added
+- **Amazon-style 3-sheet Excel export** — Instructions, Data Definitions (55 fields), Data with colored headers
+- **55-column CSV export** — separate columns for each ingredient, claim, risk, source file
+- **View button** on source files — opens PDFs in browser (inline Content-Disposition)
+- **File type color coding** — PDF green/blue, XML yellow, ZIP purple, DOCX indigo
+- **Per-licence CSV export fixed** — was showing [object Object], now 55 columns with parsed data
+- **Data validation dropdowns** in Excel export for enumerated fields
+
+### Fixed
+- **DELETE not refreshing UI** — stale closure bug. `setConfirmDel` was re-rendering before API call completed. Fixed by calling API first, then fetching fresh data directly.
+- **Delete buttons invisible** — changed from `text-red-400` (invisible in dark mode) to `bg-red-50 border-red-200 text-red-700` (proper button with background)
+- **All Remove/Delete buttons globally** — upgraded from faint text to `text-red-600 font-medium`
+- **Application links** — now go to tabbed editor `/applications/[id]` instead of old `/documents` page
+- **Class column empty** — auto-derived from submissionType (Compendial→I, Traditional→II, Non-traditional→III)
+- **EAnnatto 50 duplicate** — removed
+- **Empty "New Facility"** — cleaned up test data
+- **Facility name truncated** — added `flex-1 min-w-0`
+- **Team title column truncated** — added `min-w-[180px]`
+- **Dashboard/Application rows** — added `cursor-pointer` for clickable feel
+- **Info grid alignment** in licence detail panel — wrapped in gray card
+
+### UI/UX Audit
+- Conducted full UI/UX review of all 9 pages
+- Identified and fixed 10 bugs across Licences, Applications, Dashboard, Company Profile
+- Documented remaining known issue: Dark Reader browser extension causes "1 Issue" badge
+
+## 2026-04-12 (Day 2 — continued)
+
+### Added (late session)
+- **Global Search** — real DB queries across licences, applications, ingredients, submissions. Debounced, keyboard navigation, grouped by type.
+- **LNHPD Sync** — enriches all licences with claims, risks, doses from Health Canada API. Fixed response format handling (data wrapper vs flat array).
+- **Single PDF import** — restored to import modal (was removed during rewrite)
+- **Inline delete** — "Confirm/Cancel" buttons replace browser confirm dialog
+
+### Fixed
+- **Licence data quality** — went from 5/33 claims to 32/33 after LNHPD sync format fix
+- **Import modal** — 3 tabs (Single PDF, Folder, Scan Path) in a proper modal
+- **Duplicate prevention** — folder upload checks for existing NPN before creating
+- **Company Profile** — 3 tabs: Company Info, Facilities (1 warehouse), Team (5 members)
+
+### Documentation
+- Created `docs/SECURITY_CHECKLIST.md` — 35 security checks
+- Created `docs/REQUIREMENTS.md` — complete feature inventory
+- Created `docs/CHANGELOG.md` — this file
+- Added memory rules: never remove features, maintain docs
+
+## 2026-04-12 (Day 2)
+
+### Added
+- **Company Profile: Facilities tab** — warehouse, 3PL, foreign sites with address, site licence, GMP, manager info
+- **Company Profile: Team tab** — 5 pre-seeded team members with roles, badges (QAP, Senior Official, HC Contact)
+- **Facility & TeamMember DB tables** — full schema for facilities and team management
+- **Facilities API** — CRUD endpoints `/api/facilities`
+- **Team API** — CRUD endpoints `/api/team`
+- **Document Attachments** — upload files to any entity, download, delete, tracked
+- **Activity Tracking** — every view, download, export, upload logged with user/IP/timestamp
+- **Audit Reports** — monthly report generation with per-user breakdown (admin only)
+- **Licence Export APIs** — single (JSON/CSV) + bulk export, all audit-logged
+- **File listing API** — list PDFs in a folder for download
+- **File download API** — serve files with tracking
+- **Import Modal** — 3 tabs: Single PDF, Select Folder, Scan Local Path
+- **Duplicate detection** — skip import if NPN already exists
+- **Inline delete confirmation** — "Confirm/Cancel" buttons instead of browser dialog
+- **Dashboard stats** — now shows Active Licences (from ProductLicence table), Ingredients KB, NHPID Submissions
+
+### Fixed
+- **PDF extraction** — subprocess approach for pdf-parse (worker issue in Next.js)
+- **Recursive folder scan** — finds product folders at any depth
+- **Security: role escalation** — registration no longer accepts client role field
+- **Security: field injection** — all PUT routes use field whitelisting
+- **Security: viewer role checks** — added to 8 routes that were missing them
+- **Dark Reader hydration** — `suppressHydrationWarning` on html/body
+- **Dev overlay** — `devIndicators: false` in next.config
+- **Licences page UX** — collapsible upload, modal import, clean table layout
+- **Detail panel** — fixed right slide-out with sticky header, scrollable content
+- **Activity feed** — filtered spam entries ("0 imported")
+
+### Changed
+- **Licences page fully rewritten** — proper UX with modal import, no scroll mess
+- **Company Profile** — expanded to 3 tabs (Company Info, Facilities, Team)
+- **Dashboard** — 5 stat cards instead of 4, counts real data
+
+## 2026-04-11 (Day 1)
+
+### Built
+- Project scaffolding (Next.js + TypeScript + Tailwind + Electron)
+- Full database schema (22 tables, Prisma + SQLite)
+- Authentication system (login, register, session, roles)
+- Dashboard with stats and activity feed
+- PLA Application wizard (tabbed editor, 7 tabs)
+- AI ingredient research (Claude API)
+- Ingredient management (add/edit/delete, NHPID search)
+- Non-medicinal ingredients with dosage form presets
+- Claims, dosage, risk editors
+- Document generation (11 types including bilingual labels)
+- Document review, edit, approve workflow
+- Submission package assembly + export
+- Company profile (pre-filled Wellnessextract data)
+- Settings (API key, export path, NHPID refresh)
+- Global search shell (Ctrl+K)
+- Help panel with AI FAQ
+- Sidebar navigation with logout
+- LNHPD API client (7 endpoints)
+- Ingredient Knowledge Base page
+- NHPID Submissions page
+- Active Licences page with folder import
+- REST API for all entities
+- Audit logging on all data changes
+- 32 NPN licences imported from PDF folder scan
