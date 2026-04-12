@@ -287,7 +287,21 @@ export default function LicencesPage() {
         } catch { /* continue even if duplicate check fails */ }
 
         if (ed.licenceNumber && existing.some((l: Licence) => l.licenceNumber === ed.licenceNumber)) {
-          results.push({ folder: file.name, status: "skipped", licenceNumber: ed.licenceNumber, productName: ed.productName, error: "NPN already exists" });
+          // NPN exists — still attach this PDF to the existing licence (IL + PL pairs)
+          const existingLic = existing.find((l: Licence) => l.licenceNumber === ed.licenceNumber);
+          if (existingLic) {
+            try {
+              const attFd = new FormData();
+              attFd.append("file", file); attFd.append("entityType", "licence"); attFd.append("entityId", existingLic.id);
+              attFd.append("docCategory", file.name.toUpperCase().startsWith("IL") ? "il_letter" : file.name.toUpperCase().startsWith("PL") ? "pl_licence" : "other");
+              await fetch("/api/attachments", { method: "POST", body: attFd });
+              results.push({ folder: file.name, status: "success", licenceNumber: ed.licenceNumber, productName: ed.productName || existingLic.productName, error: "Attached to existing NPN" });
+            } catch {
+              results.push({ folder: file.name, status: "skipped", licenceNumber: ed.licenceNumber, productName: ed.productName, error: "NPN exists — could not attach PDF" });
+            }
+          } else {
+            results.push({ folder: file.name, status: "skipped", licenceNumber: ed.licenceNumber, productName: ed.productName, error: "NPN already exists" });
+          }
           setScanResults([...results]);
           continue;
         }
