@@ -5,22 +5,23 @@ import { logAudit } from "@/lib/db/audit";
 import { trackActivity } from "@/lib/tracking/activity";
 import fs from "fs/promises";
 
-// GET — download a file
+// GET — download or inline-view a file (?inline=true for browser preview)
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireAuth();
   if (isErrorResponse(user)) return user;
 
   const { id } = await params;
+  const inline = req.nextUrl.searchParams.get("inline") === "true";
   const attachment = await prisma.attachment.findUnique({ where: { id } });
 
   if (!attachment) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Track the download
-  trackActivity(user.id, "download", {
+  // Track view vs download
+  trackActivity(user.id, inline ? "view" : "download", {
     entityType: "attachment",
     entityId: attachment.id,
     entityName: attachment.fileName,
-    details: `Downloaded ${attachment.fileName} (${Math.round(attachment.fileSize / 1024)}KB)`,
+    details: `${inline ? "Viewed" : "Downloaded"} ${attachment.fileName} (${Math.round(attachment.fileSize / 1024)}KB)`,
   });
 
   try {
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return new NextResponse(buffer, {
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="${attachment.fileName}"`,
+        "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${attachment.fileName}"`,
         "Content-Length": String(buffer.length),
       },
     });
