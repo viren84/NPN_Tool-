@@ -1,5 +1,155 @@
 # Changelog — NPN Filing Tool
 
+## 2026-04-12 — Info Grid Redesign: Fill Missing Fields from LNHPD
+
+### Fixed
+- **Route always empty** — sync now fetches `/productroute/` endpoint (6th endpoint). All products now show "Oral" etc.
+- **Class always empty** — derived from submission type during sync (Compendial→I, Traditional→II, Non-traditional→III)
+- **Revised Date always empty** — sync now saves `revised_date` from LNHPD productlicence response
+- **Receipt Date never shown** — sync now saves `time_receipt` (date HC received the application)
+- **Company Code empty** — sync now saves `company_id` from LNHPD
+
+### Added
+- **One-line dosage summary** — top of info grid shows "Capsule, soft • Oral • 1 capsule • 1x/Day(s) • Adults (19+)"
+- **Status badge with dot** — active/inactive status in grid with green/red indicator
+- **LNHPD link** — "View on HC" link opens the product on Health Canada's website
+- **Receipt Date field** — new field in dates row
+
+### Changed
+- Info grid reorganized: Row 1 = summary, Row 2 = form/route/class/type, Row 3 = dates + status, Row 4 = company + HC link
+- Bulk sync (`syncLNHPD`) now also fetches routes and saves all new fields (parity with single sync)
+
+### Files Modified
+- `src/lib/sync/lnhpd-sync.ts` — both `syncLNHPD()` and `syncSingleLicence()` now fetch routes, save revisedDate/receiptDate/applicationClass/routeOfAdmin/companyCode/routesJson
+- `src/app/licences/page.tsx` — Licence interface updated, info grid redesigned with 4 rows
+- `docs/CHANGELOG.md` — this entry
+
+---
+
+## 2026-04-12 — Import Fix: Multi-File Same-NPN Consolidation + Attachment Dedup
+
+### Fixed
+- **2 PDFs for same NPN creating 2 products** — `processMultiplePdfs()` now consolidates PreviewItems by NPN before showing preview. 2 files with same NPN → 1 preview item with "2 files" → 1 ProductLicence with 2 attachments
+- **Same-batch duplicate guard** — `executeImport()` now tracks NPNs created in the current batch. If a second item with the same NPN somehow reaches the import loop, files are attached to the existing record instead of creating a duplicate
+
+### Added
+- **Cross-product attachment warning** — `POST /api/attachments` now checks if the same filename exists on a different entity. Returns `_crossEntityWarning` in response (non-blocking, informational)
+
+### Files Modified
+- `src/app/licences/page.tsx` — NPN consolidation in `processMultiplePdfs()`, batch guard in `executeImport()`
+- `src/app/api/attachments/route.ts` — cross-entity duplicate warning
+- `docs/CHANGELOG.md` — this entry
+
+---
+
+## 2026-04-12 — Sync Button Fix: Duplicate Guard + Error Feedback
+
+### Fixed
+- **Sync button silent failure** — root cause was `lnhpdId` UNIQUE constraint collision when duplicate NPN records existed. `syncSingleLicence()` now checks for existing owner before updating, returns clear error message
+- **No user feedback on sync failure** — sync button now shows `alert()` with the error message instead of silently doing nothing
+- **Duplicate EAnnatto record deleted** — second record (no lnhpdId) caused UNIQUE constraint collision on sync
+
+### Changed
+- `fetchJson()` now logs warnings on non-200 API responses instead of silently returning `[]`
+- Sync error messages surface to the user via alert dialog
+
+### Files Modified
+- `src/lib/sync/lnhpd-sync.ts` — duplicate guard in `syncSingleLicence()`, `fetchJson()` warning logs
+- `src/app/licences/page.tsx` — sync button error feedback (alert on failure)
+- `docs/CHANGELOG.md` — this entry
+
+---
+
+## 2026-04-12 — Full LNHPD Integration: Auto-Sync, Per-Product Refresh, Non-Med Ingredients
+
+### Added
+- **Per-product LNHPD sync** — new `syncSingleLicence()` function fetches all data from Health Canada for a single NPN
+- **Per-product sync API** — `POST /api/sync/lnhpd/:id` (editor+ role, not admin-only)
+- **"Sync" button in detail panel** — purple button next to NPN badge, refreshes data from Health Canada on click
+- **Auto-enrich on import** — every newly imported licence automatically syncs from LNHPD after creation
+- **Non-medicinal ingredients section** — new section in detail panel showing gray tags for inactive ingredients
+- **Non-medicinal ingredients in sync** — `syncLNHPD()` and `syncSingleLicence()` now fetch non-med ingredients from HC API
+
+### Fixed
+- **Empty detail panel sections** — root cause was JSON fields never populated from LNHPD; now auto-populated on import and manual sync
+- **LNHPD field name mapping** — detail panel now handles HC API field names (`ingredient_name`, `quantity_unit_of_measure`, `risk_text`, `risk_type_desc`, `population_type_desc`, `purpose`)
+- **Post-import sync auth** — old bulk sync required admin role (silently failed for editors); new per-product sync works for editors
+
+### Changed
+- Ingredient tags now show source material on hover (title tooltip)
+- Claims section renamed "Approved Claims" to reflect HC-approved wording
+- Dosage section now shows structured cards per population group
+- Risk section now shows risk type labels (Cautions & Warnings, Contraindications)
+
+### Files Modified
+- `src/lib/sync/lnhpd-sync.ts` — added non-med fetch, `syncSingleLicence()` export
+- `src/app/api/sync/lnhpd/[id]/route.ts` — NEW: per-product sync endpoint
+- `src/app/licences/page.tsx` — non-med section, sync button, LNHPD field mapping, auto-enrich after import
+- `docs/CHANGELOG.md` — this entry
+
+---
+
+## 2026-04-12 — Responsive Layout Fix + Upload Button Fix
+
+### Fixed
+- **Detail panel no longer overlays table** — changed from `position: fixed` to flex sibling with `sticky top-0`. Table columns now shrink naturally when panel opens, no hidden data
+- **Upload button in detail panel now works** — extracted inline async handler to stable `handleDetailUpload()` function. Fixes stale closure bug where `sl.id` reference broke on re-render. Added try/catch for error handling
+- **Panel independent scroll** — detail panel now scrolls independently with `overflow-y-auto` instead of being locked to viewport height
+
+### Changed
+- Main content uses `flex-1 min-w-0` instead of conditional `mr-[540px]` margin — proper flex shrink behavior
+- Detail panel z-index reduced from `z-50` to `z-30` — still above content but below modals (`z-[60]`)
+
+### Files Modified
+- `src/app/licences/page.tsx` — layout fix (line 536), panel fix (line 680), `handleDetailUpload` function added, inline handler replaced
+- `docs/CHANGELOG.md` — this entry
+
+---
+
+## 2026-04-12 — Import Confirmation Flow: Preview Before Import + Duplicate Options
+
+### Added
+- **Pre-import confirmation screen** — ALL import paths (Tab 1, 2, 3) now show a preview of found products before importing
+- **Duplicate detection with user choice** — duplicates show per-item buttons: Replace / Skip / Attach
+- **Batch duplicate actions** — "Replace All", "Skip All", "Attach All" buttons for bulk duplicate handling
+- **Preview item cards** — color-coded cards: green (NEW), yellow (DUPLICATE), red (ERROR) with NPN, product name, file count
+- **Import progress bar** — shows "Importing X of Y..." during the save phase
+- **scan-folder preview mode** — API accepts `preview: true` to extract without writing to DB
+- **Phase-based modal** — import modal transitions: Select -> Scanning -> Preview -> Importing -> Done
+- **Back button** — return from preview to file selection without losing context
+
+### Changed
+- `processMultiplePdfs()` now extracts only — builds preview items instead of auto-saving
+- `handleFolderUpload()` now extracts only — builds preview items instead of auto-saving
+- `doScan()` now calls scan-folder API with `preview: true` — builds preview items
+- New `executeImport()` function handles confirmed imports with Replace/Skip/Attach logic
+- Tab 3 button text changed from "Scan & Import" to "Scan & Preview"
+- Tabs hide during preview/importing/done phases
+
+### Files Modified
+- `src/app/licences/page.tsx` — PreviewItem type, importPhase state, refactored 3 extraction functions, executeImport, confirmation UI
+- `src/app/api/upload/scan-folder/route.ts` — preview mode (extract without DB writes)
+- `docs/CHANGELOG.md` — this entry
+
+---
+
+## 2026-04-12 — IL+PL Dual-PDF Fix: Consistent Attach, Dedup, Race Condition
+
+### Fixed
+- **Folder upload (Tab 2) now attaches to existing NPN** — was silently skipping with "Already exists"; now attaches IL+PL files to the existing licence (matches Tab 1 behavior)
+- **Race condition eliminated** — attachment loop now uses licence ID directly from the create response instead of searching by NPN after creation
+- **Duplicate attachment prevention** — `/api/attachments` POST now checks for existing attachment with same `entityType + entityId + fileName` before creating; returns existing record if duplicate
+- **Database-level dedup constraint** — `@@unique([entityType, entityId, fileName])` added to Attachment model in Prisma schema; prevents duplicates even under concurrent requests
+- **Removed error-prone post-loop** — old attachment loop searched by NPN after all licences were created (fragile); replaced with inline attachment during licence creation
+
+### Files Modified
+- `src/app/licences/page.tsx` — `handleFolderUpload()` attach-to-existing logic + inline attachment after create
+- `src/app/api/attachments/route.ts` — duplicate check before file save
+- `prisma/schema.prisma` — `@@unique([entityType, entityId, fileName])` on Attachment model
+- `docs/CHANGELOG.md` — this entry
+
+---
+
 ## 2026-04-12 — Table Overhaul: Multi-Select, Bulk Actions, Design Polish
 
 ### Added

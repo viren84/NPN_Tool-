@@ -643,6 +643,9 @@ model Attachment {
   uploadedBy    User     @relation("Uploads", fields: [uploadedById], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  // Prevent duplicate attachments (same file name for same entity)
+  @@unique([entityType, entityId, fileName])
 }
 
 // ================================================================

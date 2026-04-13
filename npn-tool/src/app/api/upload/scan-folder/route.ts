@@ -18,10 +18,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { folderPath } = body;
+  const { folderPath, preview } = body;
   if (!folderPath) {
     return NextResponse.json({ error: "folderPath required" }, { status: 400 });
   }
+  const isPreview = preview === true;
 
   // Normalize path for Windows
   const normalizedPath = folderPath.replace(/\//g, path.sep);
@@ -43,10 +44,14 @@ export async function POST(req: NextRequest) {
 
     const results: Array<{
       folder: string;
-      status: "success" | "error" | "skipped" | "duplicate_archived";
+      status: "success" | "error" | "skipped" | "duplicate_archived" | "duplicate";
       licenceNumber?: string;
       productName?: string;
       error?: string;
+      extractedData?: Record<string, unknown>;
+      folderPath?: string;
+      pdfFiles?: string[];
+      existingLicenceId?: string;
     }> = [];
 
     for (const folder of productFolders) {
@@ -105,64 +110,81 @@ export async function POST(req: NextRequest) {
 
         const licenceNum = (extracted.licenceNumber as string) || "";
 
-        // Duplicate detection — archive old, keep latest
-        if (licenceNum) {
-          const existing = await prisma.productLicence.findFirst({
-            where: { licenceNumber: licenceNum },
-          });
-          if (existing) {
-            // Archive the existing one (mark as non_active with duplicate tag)
-            await prisma.productLicence.update({
-              where: { id: existing.id },
-              data: {
-                productStatus: "non_active",
-                notes: `[ARCHIVED-DUPLICATE] Replaced by newer import on ${new Date().toISOString().slice(0, 10)}. ${existing.notes}`,
-              },
-            });
-            console.log(`[Scan] Archived duplicate NPN ${licenceNum}`);
-            results.push({
-              folder: folder.name,
-              status: "duplicate_archived",
-              licenceNumber: licenceNum,
-              productName: extracted.productName as string,
-            });
-          }
-        }
-
-        // Create new licence record
-        await prisma.productLicence.create({
-          data: {
-            lnhpdId: null,
+        if (isPreview) {
+          // PREVIEW MODE: return extracted data without writing to DB
+          const existing = licenceNum ? await prisma.productLicence.findFirst({ where: { licenceNumber: licenceNum } }) : null;
+          results.push({
+            folder: folder.name,
+            status: existing ? "duplicate" : "success",
             licenceNumber: licenceNum,
             productName: (extracted.productName as string) || folder.name,
-            productNameFr: (extracted.productNameFr as string) || "",
-            dosageForm: (extracted.dosageForm as string) || "",
-            routeOfAdmin: (extracted.routeOfAdmin as string) || "",
-            companyName: (extracted.companyName as string) || "",
-            companyCode: (extracted.companyCode as string) || "",
-            applicationClass: (extracted.applicationClass as string) || "",
-            submissionType: (extracted.submissionType as string) || "",
-            licenceDate: (extracted.licenceDate as string) || "",
-            revisedDate: (extracted.revisedDate as string) || "",
-            productStatus: "active",
-            medicinalIngredientsJson: JSON.stringify(extracted.medicinalIngredients || []),
-            nonMedIngredientsJson: JSON.stringify(extracted.nonMedicinalIngredients || []),
-            claimsJson: JSON.stringify(extracted.claims || []),
-            risksJson: JSON.stringify(extracted.risks || []),
-            dosesJson: JSON.stringify(extracted.doses || []),
-            licencePdfPath: folderFullPath,
-            importedFrom: "folder_scan",
-          },
-        });
+            extractedData: extracted,
+            folderPath: folderFullPath,
+            pdfFiles: pdfFiles,
+            existingLicenceId: existing?.id,
+          });
+          console.log(`[Scan-Preview] ${existing ? "Duplicate" : "New"} NPN ${licenceNum} — ${extracted.productName}`);
+        } else {
+          // LIVE MODE: write to DB (existing behavior)
 
-        results.push({
-          folder: folder.name,
-          status: "success",
-          licenceNumber: licenceNum,
-          productName: extracted.productName as string,
-        });
+          // Duplicate detection — archive old, keep latest
+          if (licenceNum) {
+            const existing = await prisma.productLicence.findFirst({
+              where: { licenceNumber: licenceNum },
+            });
+            if (existing) {
+              await prisma.productLicence.update({
+                where: { id: existing.id },
+                data: {
+                  productStatus: "non_active",
+                  notes: `[ARCHIVED-DUPLICATE] Replaced by newer import on ${new Date().toISOString().slice(0, 10)}. ${existing.notes}`,
+                },
+              });
+              console.log(`[Scan] Archived duplicate NPN ${licenceNum}`);
+              results.push({
+                folder: folder.name,
+                status: "duplicate_archived",
+                licenceNumber: licenceNum,
+                productName: extracted.productName as string,
+              });
+            }
+          }
 
-        console.log(`[Scan] Imported NPN ${licenceNum} — ${extracted.productName}`);
+          // Create new licence record
+          await prisma.productLicence.create({
+            data: {
+              lnhpdId: null,
+              licenceNumber: licenceNum,
+              productName: (extracted.productName as string) || folder.name,
+              productNameFr: (extracted.productNameFr as string) || "",
+              dosageForm: (extracted.dosageForm as string) || "",
+              routeOfAdmin: (extracted.routeOfAdmin as string) || "",
+              companyName: (extracted.companyName as string) || "",
+              companyCode: (extracted.companyCode as string) || "",
+              applicationClass: (extracted.applicationClass as string) || "",
+              submissionType: (extracted.submissionType as string) || "",
+              licenceDate: (extracted.licenceDate as string) || "",
+              revisedDate: (extracted.revisedDate as string) || "",
+              productStatus: "active",
+              medicinalIngredientsJson: JSON.stringify(extracted.medicinalIngredients || []),
+              nonMedIngredientsJson: JSON.stringify(extracted.nonMedicinalIngredients || []),
+              claimsJson: JSON.stringify(extracted.claims || []),
+              risksJson: JSON.stringify(extracted.risks || []),
+              dosesJson: JSON.stringify(extracted.doses || []),
+              licencePdfPath: folderFullPath,
+              importedFrom: "folder_scan",
+            },
+          });
+
+          results.push({
+            folder: folder.name,
+            status: "success",
+            licenceNumber: licenceNum,
+            productName: extracted.productName as string,
+          });
+
+          console.log(`[Scan] Imported NPN ${licenceNum} — ${extracted.productName}`);
+        }
       } catch (e) {
         console.error(`[Scan] Error for "${folder.name}":`, e);
         results.push({
@@ -174,9 +196,11 @@ export async function POST(req: NextRequest) {
     }
 
     const successCount = results.filter(r => r.status === "success").length;
-    const dupeCount = results.filter(r => r.status === "duplicate_archived").length;
-    await logAudit(user.id, "created", "licence", "batch_scan",
-      `${user.name} scanned folder: ${successCount} imported, ${dupeCount} duplicates archived`);
+    const dupeCount = results.filter(r => r.status === "duplicate_archived" || r.status === "duplicate").length;
+    if (!isPreview) {
+      await logAudit(user.id, "created", "licence", "batch_scan",
+        `${user.name} scanned folder: ${successCount} imported, ${dupeCount} duplicates archived`);
+    }
 
     return NextResponse.json({
       folderPath: normalizedPath,

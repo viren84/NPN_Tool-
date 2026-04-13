@@ -50,6 +50,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "File too large. Max 50MB." }, { status: 400 });
     }
 
+    // Duplicate attachment check — skip if same file already attached to THIS entity
+    const existingAttachment = await prisma.attachment.findFirst({
+      where: { entityType, entityId, fileName: file.name },
+    });
+    if (existingAttachment) {
+      return NextResponse.json({
+        ...existingAttachment,
+        _deduplicated: true,
+        message: "Attachment already exists — skipped duplicate",
+      }, { status: 200 });
+    }
+
+    // Cross-entity duplicate check — warn if same filename exists on a DIFFERENT entity
+    const crossEntityDup = await prisma.attachment.findFirst({
+      where: { entityType, fileName: file.name, entityId: { not: entityId } },
+      select: { entityId: true, entityType: true },
+    });
+
     // Save file to attachments directory
     const attachmentsDir = path.join(process.cwd(), "data", "attachments", entityType, entityId);
     await fs.mkdir(attachmentsDir, { recursive: true });
@@ -85,7 +103,10 @@ export async function POST(req: NextRequest) {
       entityName: file.name,
     });
 
-    return NextResponse.json(attachment, { status: 201 });
+    return NextResponse.json({
+      ...attachment,
+      ...(crossEntityDup ? { _crossEntityWarning: `Same file also attached to ${crossEntityDup.entityType}/${crossEntityDup.entityId}` } : {}),
+    }, { status: 201 });
   } catch (error) {
     return NextResponse.json({
       error: error instanceof Error ? error.message : "Upload failed",

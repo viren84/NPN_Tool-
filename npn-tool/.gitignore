@@ -46,3 +46,9 @@ next-env.d.ts
 *.db
 *.db-journal
 *.sqlite
+
+# uploaded attachments (user data, not source)
+/data/attachments/
+
+# temp files
+cookie.txt
