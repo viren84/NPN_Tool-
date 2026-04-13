@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { requireEditor, isErrorResponse } from "@/lib/auth/guard";
 import { whitelistFields, CLAIM_FIELDS } from "@/lib/utils/whitelist";
+import { parseJsonBody } from "@/lib/utils/parse-body";
+import { handlePrismaError } from "@/lib/errors/handle-prisma";
 
 export async function PUT(
   req: NextRequest,
@@ -11,11 +13,16 @@ export async function PUT(
   if (isErrorResponse(user)) return user;
 
   const { claimId } = await params;
-  const raw = await req.json();
-  const data = whitelistFields(raw, CLAIM_FIELDS);
+  const parsed = await parseJsonBody(req);
+  if (parsed.error) return parsed.error;
+  const data = whitelistFields(parsed.data, CLAIM_FIELDS);
 
-  const claim = await prisma.claim.update({ where: { id: claimId }, data });
-  return NextResponse.json(claim);
+  try {
+    const claim = await prisma.claim.update({ where: { id: claimId }, data });
+    return NextResponse.json(claim);
+  } catch (err) {
+    return handlePrismaError(err, "update claim");
+  }
 }
 
 export async function DELETE(
@@ -26,6 +33,10 @@ export async function DELETE(
   if (isErrorResponse(user)) return user;
 
   const { claimId } = await params;
-  await prisma.claim.delete({ where: { id: claimId } });
-  return NextResponse.json({ success: true });
+  try {
+    await prisma.claim.delete({ where: { id: claimId } });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return handlePrismaError(err, "delete claim");
+  }
 }

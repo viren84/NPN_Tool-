@@ -6,6 +6,44 @@ import { logAudit } from "@/lib/db/audit";
 import { extractTextFromPDF } from "@/lib/documents/pdf-reader";
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
+
+/**
+ * Allowlist of root paths that folder scanning may access.
+ * An attacker providing C:/Windows/System32 or /etc/ should get 403.
+ */
+function getAllowedRoots(): string[] {
+  const cwd = process.cwd(); // the project working directory (npn-tool/)
+  const home = os.homedir();
+  const roots = [
+    path.resolve(cwd, "data"),
+    path.resolve(cwd, "data", "attachments"),
+    path.resolve(home, "Downloads"),
+    path.resolve(home, "Documents"),
+    path.resolve(home, "Desktop"),
+  ];
+  // Allow env-configured extra roots (comma-separated absolute paths)
+  const extra = process.env.SCAN_ALLOWED_ROOTS;
+  if (extra) {
+    for (const p of extra.split(",").map((s) => s.trim()).filter(Boolean)) {
+      try { roots.push(path.resolve(p)); } catch { /* ignore */ }
+    }
+  }
+  return roots;
+}
+
+/** Check whether a resolved path is inside any allowed root */
+function isPathAllowed(resolved: string): boolean {
+  const roots = getAllowedRoots();
+  for (const root of roots) {
+    const rel = path.relative(root, resolved);
+    // rel must not start with ".." (would mean outside root), and not be absolute
+    if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) return true;
+    // resolved path IS the root itself
+    if (resolved === root) return true;
+  }
+  return false;
+}
 
 export async function POST(req: NextRequest) {
   const user = await requireEditor();
@@ -22,10 +60,24 @@ export async function POST(req: NextRequest) {
   if (!folderPath) {
     return NextResponse.json({ error: "folderPath required" }, { status: 400 });
   }
+  if (typeof folderPath !== "string") {
+    return NextResponse.json({ error: "folderPath must be a string" }, { status: 400 });
+  }
   const isPreview = preview === true;
 
-  // Normalize path for Windows
-  const normalizedPath = folderPath.replace(/\//g, path.sep);
+  // Normalize path for Windows and RESOLVE to absolute (eliminates ".." traversal)
+  const normalizedPath = path.resolve(folderPath.replace(/\//g, path.sep));
+
+  // SECURITY: Enforce allowlist — reject arbitrary filesystem scans
+  if (!isPathAllowed(normalizedPath)) {
+    return NextResponse.json(
+      {
+        error: "Path not permitted. Folder scanning is restricted to user Downloads/Documents/Desktop and the app data directory.",
+        allowedRoots: getAllowedRoots(),
+      },
+      { status: 403 }
+    );
+  }
 
   try {
     // Verify folder exists

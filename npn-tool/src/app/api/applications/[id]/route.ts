@@ -3,6 +3,10 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAuth, requireEditor, isErrorResponse } from "@/lib/auth/guard";
 import { logAudit } from "@/lib/db/audit";
 import { whitelistFields, APPLICATION_FIELDS, validateApplicationClass } from "@/lib/utils/whitelist";
+import { parseJsonBody } from "@/lib/utils/parse-body";
+import { handlePrismaError } from "@/lib/errors/handle-prisma";
+
+const VALID_APP_STATUSES = ["draft", "in_review", "submitted", "approved", "rejected", "cancelled", "amendment", "irn_response"];
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireAuth();
@@ -33,7 +37,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (isErrorResponse(user)) return user;
 
   const { id } = await params;
-  const raw = await req.json();
+
+  const parsed = await parseJsonBody(req);
+  if (parsed.error) return parsed.error;
+  const raw = parsed.data;
 
   // Optimistic locking
   if (raw.version !== undefined) {
@@ -50,11 +57,22 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Invalid application class. Must be I, II, or III." }, { status: 400 });
   }
 
-  const application = await prisma.application.update({
-    where: { id },
-    data: { ...data, version: { increment: 1 } },
-  });
+  // Validate status if provided
+  if (data.status !== undefined && !VALID_APP_STATUSES.includes(data.status as string)) {
+    return NextResponse.json(
+      { error: `Invalid status. Must be one of: ${VALID_APP_STATUSES.join(", ")}` },
+      { status: 400 }
+    );
+  }
 
-  await logAudit(user.id, "updated", "application", id, `${user.name} updated PLA "${application.productName}"`);
-  return NextResponse.json(application);
+  try {
+    const application = await prisma.application.update({
+      where: { id },
+      data: { ...data, version: { increment: 1 } },
+    });
+    await logAudit(user.id, "updated", "application", id, `${user.name} updated PLA "${application.productName}"`);
+    return NextResponse.json(application);
+  } catch (err) {
+    return handlePrismaError(err, "update application");
+  }
 }

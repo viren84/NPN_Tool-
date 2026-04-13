@@ -3,12 +3,25 @@ import { prisma } from "@/lib/db/prisma";
 import { hashPassword } from "@/lib/auth/password";
 import { setSession } from "@/lib/auth/session";
 import { logAudit } from "@/lib/db/audit";
+import { parseJsonBody } from "@/lib/utils/parse-body";
+
+const MIN_PASSWORD_LENGTH = 6;
 
 export async function POST(req: NextRequest) {
-  const { username, password, name, email, role } = await req.json();
+  const parsed = await parseJsonBody<{
+    username: unknown; password: unknown; name: unknown; email?: unknown;
+  }>(req);
+  if (parsed.error) return parsed.error;
+  const { username, password, name, email } = parsed.data;
 
   if (!username || !password || !name) {
     return NextResponse.json({ error: "Username, password, and name required" }, { status: 400 });
+  }
+  if (typeof username !== "string" || typeof password !== "string" || typeof name !== "string") {
+    return NextResponse.json({ error: "username, password, and name must be strings" }, { status: 400 });
+  }
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return NextResponse.json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` }, { status: 400 });
   }
 
   const existing = await prisma.user.findUnique({ where: { username } });
