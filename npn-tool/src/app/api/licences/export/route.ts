@@ -16,8 +16,11 @@ export async function GET(req: NextRequest) {
   const purpose = req.nextUrl.searchParams.get("purpose") || "api_access";
   const agent = req.nextUrl.searchParams.get("agent") || "";
 
+  const ids = req.nextUrl.searchParams.get("ids") || "";
+
   const where: Record<string, unknown> = {};
   if (status && status !== "all") where.productStatus = status;
+  if (ids) where.id = { in: ids.split(",").filter(Boolean) };
 
   const licences = await prisma.productLicence.findMany({
     where,

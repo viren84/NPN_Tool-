@@ -46,3 +46,18 @@ next-env.d.ts
 *.db
 *.db-journal
 *.sqlite
+
+# uploaded attachments (user data, not source)
+/data/attachments/
+
+# temp files
+cookie.txt
+
+# generated application packages (test artifacts + user exports)
+/output/
+
+# mockup/scratch HTML
+/mockup-*.html
+
+# local tool config duplicates (use root .claude/)
+/.claude/

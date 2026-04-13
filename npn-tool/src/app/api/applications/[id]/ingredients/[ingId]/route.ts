@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db/prisma";
 import { requireEditor, isErrorResponse } from "@/lib/auth/guard";
 import { logAudit } from "@/lib/db/audit";
 import { whitelistFields, INGREDIENT_FIELDS } from "@/lib/utils/whitelist";
+import { parseJsonBody } from "@/lib/utils/parse-body";
+import { handlePrismaError } from "@/lib/errors/handle-prisma";
 
 export async function PUT(
   req: NextRequest,
@@ -12,18 +14,21 @@ export async function PUT(
   if (isErrorResponse(user)) return user;
 
   const { ingId } = await params;
-  const raw = await req.json();
-  const data = whitelistFields(raw, INGREDIENT_FIELDS);
+  const parsed = await parseJsonBody(req);
+  if (parsed.error) return parsed.error;
+  const data = whitelistFields(parsed.data, INGREDIENT_FIELDS);
 
-  const ingredient = await prisma.medicinalIngredient.update({
-    where: { id: ingId },
-    data,
-  });
-
-  await logAudit(user.id, "updated", "ingredient", ingId,
-    `${user.name} updated ingredient "${ingredient.properName}"`);
-
-  return NextResponse.json(ingredient);
+  try {
+    const ingredient = await prisma.medicinalIngredient.update({
+      where: { id: ingId },
+      data,
+    });
+    await logAudit(user.id, "updated", "ingredient", ingId,
+      `${user.name} updated ingredient "${ingredient.properName}"`);
+    return NextResponse.json(ingredient);
+  } catch (err) {
+    return handlePrismaError(err, "update ingredient");
+  }
 }
 
 export async function DELETE(
@@ -34,12 +39,15 @@ export async function DELETE(
   if (isErrorResponse(user)) return user;
 
   const { ingId } = await params;
-  const ingredient = await prisma.medicinalIngredient.findUnique({ where: { id: ingId } });
 
-  await prisma.medicinalIngredient.delete({ where: { id: ingId } });
-
-  await logAudit(user.id, "deleted", "ingredient", ingId,
-    `${user.name} deleted ingredient "${ingredient?.properName}"`);
-
-  return NextResponse.json({ success: true });
+  try {
+    const ingredient = await prisma.medicinalIngredient.findUnique({ where: { id: ingId } });
+    if (!ingredient) return NextResponse.json({ error: "Ingredient not found" }, { status: 404 });
+    await prisma.medicinalIngredient.delete({ where: { id: ingId } });
+    await logAudit(user.id, "deleted", "ingredient", ingId,
+      `${user.name} deleted ingredient "${ingredient.properName}"`);
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return handlePrismaError(err, "delete ingredient");
+  }
 }

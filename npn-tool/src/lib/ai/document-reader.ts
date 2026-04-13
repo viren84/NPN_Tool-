@@ -47,7 +47,20 @@ For ingredient_spec, extract: properName, commonName, scientificName, casNumber,
 
 Return ONLY valid JSON.`;
 
-  const response = await askClaude(READER_SYSTEM, classifyPrompt, { maxTokens: 4096, temperature: 0.1 });
+  let response: string;
+  try {
+    response = await askClaude(READER_SYSTEM, classifyPrompt, { maxTokens: 4096, temperature: 0.1 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("API key") || msg.includes("not configured") || msg.includes("401")) {
+      throw new Error("Claude API key not configured — go to Settings to add it");
+    }
+    throw new Error(`AI extraction failed: ${msg.slice(0, 150)}`);
+  }
+
+  if (!response || response.trim().length === 0) {
+    throw new Error("AI returned an empty response — please try again");
+  }
 
   try {
     const cleaned = response.replace(/```json\n?|\n?```/g, "").trim();
@@ -57,7 +70,7 @@ Return ONLY valid JSON.`;
       documentType: "unknown",
       confidence: 0,
       extractedData: { rawText: textContent.slice(0, 2000) },
-      warnings: ["Failed to parse AI extraction. Raw text preserved for manual review."],
+      warnings: ["Failed to parse AI response. Raw text preserved for manual review."],
     };
   }
 }
@@ -93,13 +106,26 @@ Return JSON with these exact fields:
 
 Return ONLY valid JSON. Use null for fields that cannot be determined.`;
 
-  const response = await askClaude(READER_SYSTEM, prompt, { maxTokens: 4096, temperature: 0.1 });
+  let response: string;
+  try {
+    response = await askClaude(READER_SYSTEM, prompt, { maxTokens: 4096, temperature: 0.1 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (msg.includes("API key") || msg.includes("not configured") || msg.includes("401")) {
+      return { error: "Claude API key not configured — go to Settings to add it" };
+    }
+    return { error: `AI extraction failed: ${msg.slice(0, 150)}` };
+  }
+
+  if (!response || response.trim().length === 0) {
+    return { error: "AI returned empty response — PDF text may be too short or unclear" };
+  }
 
   try {
     const cleaned = response.replace(/```json\n?|\n?```/g, "").trim();
     return JSON.parse(cleaned);
   } catch {
-    return { error: "Failed to extract licence data", rawText: textContent.slice(0, 2000) };
+    return { error: "AI returned invalid data — could not parse response", rawText: textContent.slice(0, 2000) };
   }
 }
 

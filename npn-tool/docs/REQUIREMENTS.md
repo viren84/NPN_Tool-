@@ -77,6 +77,15 @@ AI-powered 360° Health Canada NHP regulatory management platform for UV Interna
 | Export all licences (JSON/CSV) | ✅ Done | `/api/licences/export` |
 | Inline delete with confirm | ✅ Done | Table actions |
 | Archived rows sorted to bottom + dimmed | ✅ Done | Table |
+| LNHPD per-product sync (6 HC endpoints) | ✅ Done | Detail panel sync button |
+| Auto-enrich from LNHPD on every import | ✅ Done | Auto on import |
+| Multi-file NPN consolidation (2 PDFs → 1 product) | ✅ Done | Import modal |
+| Info grid with full LNHPD enrichment (4 rows) | ✅ Done | Detail panel |
+| Responsive detail panel (flex, independent scroll) | ✅ Done | Detail panel |
+| "View on HC" link per product | ✅ Done | Detail panel |
+| 3-sheet Excel export (summary, ingredients, claims) | ✅ Done | `/api/licences/export-excel` |
+| Global search (Ctrl+K) across all entities | ✅ Done | `GlobalSearch.tsx` |
+| Bulk sync all licences from LNHPD | ✅ Done | `/api/sync/lnhpd` |
 
 ### 5. Ingredient Knowledge Base
 | Feature | Status | Page |
@@ -131,6 +140,8 @@ AI-powered 360° Health Canada NHP regulatory management platform for UV Interna
 | Input sanitization | ✅ Done | XSS prevention |
 | File upload size limits | ✅ Done | 50MB max |
 | Document attachments per entity | ✅ Done | Attachment table |
+| Cross-entity attachment duplicate warning | ✅ Done | Non-blocking `_crossEntityWarning` |
+| Unique constraint on attachment (entity+filename) | ✅ Done | `@@unique` in Prisma |
 
 ### 10. API Hub (External Access)
 | Endpoint | Method | Auth | Description |
@@ -166,14 +177,23 @@ User, CompanyProfile, Facility, TeamMember, Ingredient, Monograph, IngredientMon
 ---
 
 ## Pending / Future Features
-- [ ] Global search connected to real DB data
-- [ ] LNHPD sync service (periodic refresh to local DB)
+- [x] ~~Global search connected to real DB data~~ — DONE (Ctrl+K, `/api/search`)
+- [x] ~~LNHPD sync service~~ — DONE (per-product + bulk sync, auto-enrich on import)
+- [ ] Product Pipeline section (pre-NPN products tracked by name, not NPN)
+- [ ] Product status stages (15-stage lifecycle from Research to Active)
+- [ ] Dr. Naresh review workflow (compliance role, submission queue, approval chain)
+- [ ] Amendment lifecycle tracking (LicenceAmendment → review → HC submission)
+- [ ] Secure Vault (owner-only documents, per-person sharing, Recipe Exposed list)
+- [ ] Tool 2 read-only API endpoints (product data for Shopify, Amazon, 3PL, marketing)
+- [ ] Multi-company support (consultant manages 20+ company portfolios)
+- [ ] Monthly NHPID monograph sync and local replica
 - [ ] Local-first ingredient research (check DB before Claude)
 - [ ] Monograph CRUD with PDF import
 - [ ] Site Licence Management module
 - [ ] Existing product import from SharePoint Excel
 - [ ] COA upload with AI parsing (Claude Vision)
-- [ ] IRN response workflow
+- [ ] IRN response workflow (Health Canada questions tracking)
+- [ ] AI self-scrutiny step for application drafts
 - [ ] Email integration for document sharing
 - [ ] Pagination on large tables
 - [ ] Test framework (vitest) + automated tests
