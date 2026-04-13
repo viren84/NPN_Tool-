@@ -1,5 +1,22 @@
 # Changelog — NPN Filing Tool
 
+## 2026-04-12 — Documentation: Architecture, Test Journeys, Vision Update
+
+### Added
+- **docs/ARCHITECTURE.md** — Full system architecture (30KB): tech stack, deployment model, 5 data flow diagrams, state management, directory structure, 27-model DB architecture, LNHPD/Claude/NHPID integration details, security model, backup & recovery, API route map
+- **docs/TEST_JOURNEYS.md** — Command-based test system: 110+ `@command:name #tag` test commands, 16 tags (#import, #sync, #security, #edge, #performance, #data-flow, #regression, #electron, #backup, #api, etc.). Run one / run tag / run all. Covers every page, every button, cross-system regression, error recovery, edge cases, performance, security, Electron, backup
+- **.gitignore** — Added `/data/attachments/` (user data) and `cookie.txt` (temp)
+
+### Changed
+- **docs/VISION.md** — Refreshed "What's Built" with LNHPD sync, auto-enrich, smart import, NPN consolidation, info grid, global search, Excel export. Updated "Next Priorities" to 12 items (removed completed: responsive UI, global search)
+- **docs/REQUIREMENTS.md** — Marked completed: LNHPD sync, global search, multi-file consolidation, info grid enrichment, cross-entity dedup. Added 8 new pending features: Product Pipeline, Dr. Naresh workflow, Secure Vault, amendments, Tool 2 API, multi-company, AI self-scrutiny
+- **docs/ARCHITECTURE.md** — Added: Deployment & Installation table, State Management section with diagram, Backup & Recovery section. Renumbered sections 3→9
+
+### Files Modified
+- `docs/ARCHITECTURE.md`, `docs/TEST_JOURNEYS.md` (NEW), `docs/VISION.md`, `docs/REQUIREMENTS.md`, `docs/CHANGELOG.md`, `.gitignore`
+
+---
+
 ## 2026-04-12 — Info Grid Redesign: Fill Missing Fields from LNHPD
 
 ### Fixed

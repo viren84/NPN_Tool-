@@ -264,29 +264,60 @@ Once the system is live, **every interaction is logged**:
 ## What's Built vs. What's Next
 
 ### Built and Working Now
-- Active Licences library with full detail panels
-- Smart PDF import with AI extraction (3 methods: upload PDFs, select folder, scan path)
-- Pre-import confirmation with duplicate handling (Replace / Skip / Attach)
-- Document attachment management (View / Download / Remove)
-- Bulk select, bulk delete, CSV/Excel export
-- Company profile, team members, facilities
-- Ingredient Knowledge Base
-- NHPID Submissions tracking
-- PLA Application builder with ingredients, claims, doses, risks
-- Basic audit logging (who did what, when)
-- User authentication with roles (admin, editor, viewer)
+
+**Core Platform**
+- Active Licences library with full detail panels (info grid, ingredients, claims, risks, doses, attachments)
+- Smart PDF import with AI extraction (3 methods: upload PDFs, select folder, scan server path)
+- Pre-import preview with duplicate detection (Replace / Skip / Attach per-item + bulk actions)
+- Multi-file NPN consolidation (2 PDFs for same NPN → 1 product with 2 attachments, not 2 products)
+- Document attachment management (View / Download / Upload / Remove) with cross-entity duplicate warning
+- Responsive detail panel (flex layout, independent scroll, no content overlay)
+
+**Health Canada Integration**
+- Full LNHPD sync with 6 HC API endpoints (medicinal ingredients, non-med ingredients, claims, risks, doses, routes)
+- Per-product sync button in detail panel (purple sync badge next to NPN)
+- Auto-enrich from LNHPD on every import (fire-and-forget, non-blocking)
+- Derived fields: application class (Compendial→I, Traditional→II, Non-traditional→III), route of administration, company code
+- Info grid with 4 rows: dosage summary, form/route/class/type, dates/status badge, company + "View on HC" link
+- Duplicate lnhpdId guard (UNIQUE constraint protection with clear error messages)
+
+**Data Management**
+- Bulk select, bulk delete with cascading attachment cleanup
+- Global search (Ctrl+K) across licences, applications, ingredients, submissions
+- Single licence CSV export (55 columns, flattened JSON fields)
+- Bulk CSV export (multi-row, same 55-column format)
+- 3-sheet Excel export (product summary, ingredients detail, claims + risks)
+- Application package export (full JSON with all child records)
+
+**Application Builder**
+- PLA Application builder with 7-tab editor (basic info, ingredients, non-med, claims, dosage, risk, documents/package)
+- AI-powered document generation (11 document types via Claude + Handlebars templates)
+- Bilingual label generation (English + French via AI regulatory translation)
+- AI ingredient research (regulatory info, dose ranges, warnings)
+- Submission readiness score (percentage based on completeness)
+
+**Company & Admin**
+- Company profile, team members with regulatory role badges (QAP, Senior Official, HC Contact), facilities
+- Ingredient Knowledge Base with CSV import/export
+- NHPID Submissions tracking with evidence packages and product strategies
+- User authentication with roles (admin, editor, viewer) and session management
+- Audit logging (AuditLog for data changes, ActivityLog for user interactions)
+- Monthly audit report generation
+- Field whitelisting, HTML sanitization, parameterized queries
 
 ### Next Priorities
-1. Responsive UI fixes (table resize + upload button)
-2. Product Pipeline section (separate from Active Licences — for pre-NPN products)
-3. Product status stages (full lifecycle tracking)
-4. Dr. Naresh review workflow
-5. Monthly NHPID database sync and local replica
-6. Secure Vault implementation
-7. Enhanced security: detailed click/view logging, monthly audit reports, data leak detection
-8. API endpoints for Tool 2 integration
-9. Multi-company support (scalability)
-10. AI self-scrutiny step for application drafts
+1. Product Pipeline section (separate from Active Licences — for pre-NPN products tracked by name, not NPN)
+2. Product status stages (full 15-stage lifecycle: Research → Formulation → Draft → Review → Submission → Approval → Active → Amendment)
+3. Dr. Naresh review workflow (compliance role, submission queue, change tracking, approval chain, company-issued email login)
+4. Amendment lifecycle (LicenceAmendment → review → HC submission → approval tracking)
+5. Monthly NHPID monograph sync and local replica (Monograph + IngredientMonographLink tables ready)
+6. Secure Vault implementation (owner-only docs, per-person sharing, access logging, Recipe Exposed list, employee agreement integration)
+7. Enhanced security: detailed click/view logging, monthly audit reports with Aman review, data leak detection, unusual access alerts
+8. Tool 2 read-only API endpoints (product data for Shopify, Amazon, 3PL, label design, marketing materials)
+9. Multi-company support (consultant mode — Dr. Naresh manages 20+ company portfolios from one login)
+10. AI self-scrutiny step for application drafts (completeness check, monograph compliance, gap flagging before Dr. Naresh review)
+11. COA upload with AI parsing (Claude Vision for Certificate of Analysis documents)
+12. IRN response workflow (Health Canada questions tracking, response drafting, status updates)
 
 ---
 
