@@ -1,10 +1,10 @@
 # AGENT 7: TESTING
-> Owner of 110+ tests, TEST_JOURNEYS.md, and the full slash command test suite.
+> Owner of 136 tests, TEST_JOURNEYS.md, and the full slash command test suite.
 
 ## MY DOMAIN
 I own:
 - All tests documented in docs/TEST_JOURNEYS.md
-- 110+ test scenarios across the entire application
+- 136 test scenarios across the entire application (124 executable, 12 skipped)
 - 16 test tags: #import #sync #security #edge #performance #regression #electron #backup #api + (planned: #pipeline #vault #drnaresh #amendment #coa #compliance #monograph)
 - All slash commands in .claude/commands/:
   - /test-all — run entire suite
@@ -35,8 +35,9 @@ I do NOT own: Application code (→ respective agent), database schema (→ DATA
 - ⚠️ Next.js 16 ≠ training data. Test runner configuration may differ — always verify.
 
 ### Current Status
-- **Status: GREEN** — 19 bugs fixed in last session
-- All existing tests passing
+- **Status: GREEN** — 124/124 executable tests passing, 0 failures, 12 skipped
+- Last full run: 2026-04-14
+- Skips: require files (PDF upload), Claude API key, or CSV data
 
 ## MY IMPROVEMENT QUEUE
 1. **Add #pipeline tag** — tests for Product Pipeline when built (VISION #1)
@@ -53,12 +54,12 @@ I do NOT own: Application code (→ respective agent), database schema (→ DATA
 - Electron-specific test coverage is limited
 
 ## INBOUND IMPACT LOG
-_(Other agents write here when their changes need test updates)_
 - [ALL AGENTS → me]: "Every domain change needs corresponding test coverage"
 - [SECURITY → me]: "Auth changes need #security tag test updates"
 - [API → me]: "Route changes need #api tag test updates"
 - [DATABASE → me]: "Migration changes need #regression tag test updates"
 - [COMPLIANCE → me]: "Regulatory rule changes need compliance scenario updates"
+- [2026-04-14 MASTER UPDATE]: Test count updated 110→136. New features need test coverage: PDF export (generateSingleDocPdf, generateCombinedPdf, editable form fields), document review (Import, Discard, Export PDF buttons), WizardStepper (clickable steps). Consider adding #pdf-export tag.
 
 ## OUTBOUND IMPACT MAP
 - [me → ALL AGENTS]: "When tests fail, the responsible agent must fix before anything else ships"

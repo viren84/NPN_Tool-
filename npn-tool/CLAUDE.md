@@ -31,22 +31,27 @@ Blocked by: DATABASE agent must design Product model first.
 
 ## API SCHEMA SUMMARY
 
-**53 API routes** across src/app/api/
+**~60 API routes** across src/app/api/
 
 Core endpoints:
 - POST /api/upload/process — PDF import (Claude extraction → dedup → enrich)
 - GET/POST /api/licences — ProductLicence CRUD
 - GET/POST /api/applications — Application (PLA) CRUD
-- POST /api/applications/generate — Document generation (11 templates)
-- POST /api/applications/export — JSON/CSV/Excel export
-- POST /api/sync/single — Single licence LNHPD sync
+- POST /api/applications/generate — Document generation (13 templates)
+- GET /api/applications/export — JSON package export
+- POST /api/applications/export — HTML file package export
+- GET /api/applications/export-pdf — Editable PDF export (combined or ?docType= single)
+- POST /api/sync/lnhpd/{id} — Single licence LNHPD sync
 - POST /api/sync/bulk — Bulk LNHPD sync
 - GET/POST /api/ingredients — Ingredient knowledge base
-- GET/POST /api/companies — Company/Facility management
+- GET/POST /api/company — Company/Facility management
 - POST /api/auth/login — Authentication
 - POST /api/auth/logout — Session end
+- GET /api/activity — Activity feed (requireAuth)
+- GET /api/search — Global search (XSS sanitized)
+- GET /api/dashboard/stats — Dashboard statistics
 
-Auth levels: requireAuth (all read), requireEditor (create/update), requireAdmin (delete/config)
+Auth levels: requireAuth (all read + activity), requireEditor (create/update), requireAdmin (delete/config)
 
 ---
 
@@ -62,8 +67,9 @@ Classification system:
 
 Current state:
 - Class I/II/III derivation: BUILT and working in LNHPD sync
-- Claim validation: BUILT in Application builder
-- EN/FR bilingual output: BUILT in all 11 templates
+- Claim validation: BUILT in Application builder (client-side only — no server-side enforcement yet)
+- EN/FR bilingual output: BUILT in all 13 templates
+- Editable PDF export: BUILT (pdf-lib, form fields, single + combined)
 - Dr. Naresh review: NOT BUILT (VISION #3)
 - AI self-scrutiny: NOT BUILT (VISION #10)
 - Amendment handling: NOT BUILT (VISION #4)
@@ -79,7 +85,7 @@ Current state:
 | SECURITY | Auth, Vault | Waiting | Build Secure Vault (VISION #6) |
 | DATABASE | Schema, Migrations | Waiting | Product Pipeline schema (VISION #1) |
 | COMPLIANCE | NHPD Rules | Waiting | Dr. Naresh workflow (VISION #3) |
-| API | 53 Routes, LNHPD Sync | Waiting | Tool 2 read-only API (VISION #8) |
-| FEATURE | UI, 7-Tab Builder | Waiting | Product Pipeline view (VISION #1) |
-| TESTING | 110+ Tests | GREEN | Add #pipeline tag (VISION #1) |
-| DOCUMENTS | 11 Templates, Exports | Waiting | AI self-scrutiny (VISION #10) |
+| API | ~60 Routes, LNHPD Sync | Waiting | Tool 2 read-only API (VISION #8) |
+| FEATURE | UI, 8-Tab Builder, Wizard | Waiting | Product Pipeline view (VISION #1) |
+| TESTING | 136 Tests | GREEN | Add #pipeline tag (VISION #1) |
+| DOCUMENTS | 13 Templates, PDF/CSV/Excel | Waiting | AI self-scrutiny (VISION #10) |

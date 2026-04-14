@@ -56,12 +56,13 @@ When ANY feature touches: medicinal ingredients, claims, dosage, risk informatio
 - Vision items 1-3 have undocumented interdependencies
 
 ## INBOUND IMPACT LOG
-_(Other agents write here when their changes affect orchestration)_
+- [2026-04-14 MASTER UPDATE]: PDF export feature built (pdf-lib), document review UX overhauled, WizardStepper added, XSS fix, activity feed auth changed, 25 orphaned attachments cleaned. Route count 53→60, test count 110→136, template count 11→13. DOC_LABELS centralized. All agents notified.
 
 ## OUTBOUND IMPACT MAP
 - [me → ALL AGENTS]: When vision priority order changes, all agents must re-check their improvement queues
 - [me → TESTING]: When agent roster changes, testing must add new tags
 - [me → COMPLIANCE]: When any vision item touches NPN rules, compliance must review before work begins
+- [me → ALL AGENTS 2026-04-14]: Master update — route count now ~60, tests 136, templates 13. PDF export with pdf-lib. Activity feed auth changed to requireAuth.
 
 ---
 

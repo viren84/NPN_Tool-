@@ -41,13 +41,13 @@ I do NOT own: Database schema (→ DATABASE), API routes (→ API), document tem
 - Amendment rules not codified — team relies on memory
 
 ## INBOUND IMPACT LOG
-_(Other agents write here when their changes affect compliance)_
 - [DATABASE → me]: "New fields on Application model may change what data is available for regulatory review"
 - [DOCUMENTS → me]: "Template changes must be reviewed for NHPD compliance before deployment"
 - [API → me]: "New claim endpoints must enforce classification-level restrictions"
+- [2026-04-14 MASTER UPDATE]: Editable PDF export now generates fillable regulatory documents (pdf-lib). Users can edit form fields in exported PDFs. Compliance implication: editable PDFs could be modified after generation — consider adding a hash/checksum for tamper detection. No server-side claim validation exists yet — claims accepted without class-level checks.
 
 ## OUTBOUND IMPACT MAP
-- [me → DOCUMENTS]: "When compliance rules change, all 11 templates must be reviewed for accuracy"
+- [me → DOCUMENTS]: "When compliance rules change, all 13 templates must be reviewed for accuracy"
 - [me → API]: "When claim validation rules change, claim-related API endpoints must be updated"
 - [me → DATABASE]: "Dr. Naresh workflow needs reviewStatus, reviewerId, reviewNotes fields on Application"
 - [me → TESTING]: "Any compliance change needs #compliance test tag coverage and regulatory test scenarios"

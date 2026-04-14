@@ -37,13 +37,13 @@ I do NOT own: Database schema design (→ DATABASE), API route logic (→ API), 
 - No session expiry warning — users lose work on silent timeout
 
 ## INBOUND IMPACT LOG
-_(Other agents write here when their changes affect security)_
 - [DATABASE → me]: "Any new model with user data must have field whitelisting defined"
 - [API → me]: "Any new route must specify which auth level it requires"
 - [DOCUMENTS → me]: "Document download endpoints must check user permissions"
+- [2026-04-14 MASTER UPDATE]: Activity feed route changed from requireAdmin → requireAuth (all users can see activity). XSS sanitization added to search query (strips <> brackets). New routes added: export-pdf, dashboard/stats, sync/bulk, strategies — all have correct auth levels. PDF export (export-pdf) uses getSession() auth.
 
 ## OUTBOUND IMPACT MAP
-- [me → API]: "When auth middleware changes, all 53 routes must be re-verified"
+- [me → API]: "When auth middleware changes, all ~60 routes must be re-verified"
 - [me → DATABASE]: "When User/Session model changes, migration must preserve existing sessions"
 - [me → TESTING]: "Any auth change requires updated #security test tag coverage"
 - [me → COMPLIANCE]: "Data exposure rules affect what compliance data can be shown to which roles"

@@ -1,9 +1,9 @@
 # AGENT 5: API
-> Owner of 53 API routes, LNHPD sync engine, and Next.js 16 enforcement.
+> Owner of ~60 API routes, LNHPD sync engine, and Next.js 16 enforcement.
 
 ## MY DOMAIN
 I own:
-- All 53 API routes in src/app/api/ (~108 TS/TSX files)
+- All ~60 API routes in src/app/api/
 - LNHPD sync engine: src/lib/sync/lnhpd-sync.ts
   - syncSingleLicence / syncLNHPD (bulk)
   - 300ms throttle between requests
@@ -40,11 +40,11 @@ I do NOT own: Database schema (→ DATABASE), auth middleware logic (→ SECURIT
 - Tool 2 API not built — external systems cannot read NPN data
 
 ## INBOUND IMPACT LOG
-_(Other agents write here when their changes affect API routes)_
 - [DATABASE → me]: "Schema changes affect request/response contracts on all related routes"
-- [SECURITY → me]: "Auth middleware changes require re-verification of all 53 routes"
+- [SECURITY → me]: "Auth middleware changes require re-verification of all ~60 routes"
 - [COMPLIANCE → me]: "Claim validation rule changes must be reflected in claim API endpoints"
 - [DOCUMENTS → me]: "Template changes may affect /generate and /export endpoint payloads"
+- [2026-04-14 MASTER UPDATE]: 7 new routes added: GET /api/applications/{id}/export-pdf (combined + ?docType= single), GET /api/applications/{id}/export (JSON), GET /api/dashboard/stats, POST /api/sync/bulk, CRUD /api/ingredient-submissions/{id}/strategies. Activity route auth changed from requireAdmin to requireAuth. Search route now sanitizes query (strips <>). Total routes now ~60.
 
 ## OUTBOUND IMPACT MAP
 - [me → DATABASE]: "New routes may require new fields or relations in schema"

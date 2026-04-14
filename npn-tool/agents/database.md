@@ -45,10 +45,10 @@ I do NOT own: Auth logic (→ SECURITY), API route code (→ API), UI rendering 
 - SecureVault schema not finalized — blocks SECURITY agent from building it
 
 ## INBOUND IMPACT LOG
-_(Other agents write here when their changes affect the database)_
 - [COMPLIANCE → me]: "Dr. Naresh workflow needs a review status field on Application model"
 - [FEATURE → me]: "Product Pipeline UI needs a new Product model before it can render"
 - [API → me]: "NHPID monograph sync endpoint needs complete Monograph relations"
+- [2026-04-14 MASTER UPDATE]: New dependency pdf-lib added to package.json. New file src/lib/constants/doc-labels.ts (DOC_LABELS + DOC_ORDER centralized). New file src/lib/documents/pdf-generator.ts (editable PDF generation). 25 orphaned Attachment records cleaned from DB. No schema changes needed — all existing models sufficient.
 
 ## OUTBOUND IMPACT MAP
 - [me → API]: "Any schema change requires API route contract review — new/changed fields affect request/response shapes"

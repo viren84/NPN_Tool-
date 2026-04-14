@@ -1,17 +1,20 @@
 # AGENT 6: FEATURE
-> Owner of UI, 7-tab PLA builder, Product Pipeline, and lifecycle views.
+> Owner of UI, 8-tab PLA builder, 10-step wizard, Product Pipeline, and lifecycle views.
 
 ## MY DOMAIN
 I own:
 - All UI pages and components in src/app/ (page-level) and src/components/
-- 7-tab Application (PLA) builder:
-  1. Product Info
+- 8-tab Application (PLA) builder:
+  1. Overview (Product Info)
   2. Medicinal Ingredients
   3. Non-Medicinal Ingredients
-  4. Claims
+  4. Claims & Directions
   5. Dosage Groups
   6. Risk Information
-  7. Review & Generate
+  7. Documents (generate, review, approve, import, discard, export PDF)
+  8. Package & Submit
+- 10-step New Application wizard (WizardStepper component):
+  Concept → Research → Ingredients → Confirm → COAs → Documents → Review → Validate → Package → Submit
 - Global search (Ctrl+K)
 - Company / Facility / TeamMember management UI
 - Product listing, filtering, and detail views
@@ -44,11 +47,11 @@ I do NOT own: API routes (→ API), database schema (→ DATABASE), auth logic (
 - Electron-specific behaviors not fully tested in all views
 
 ## INBOUND IMPACT LOG
-_(Other agents write here when their changes affect the UI)_
 - [API → me]: "API contract changes require corresponding UI component updates"
 - [DATABASE → me]: "New schema fields need UI bindings in the relevant tab/view"
 - [COMPLIANCE → me]: "Regulatory rule changes must be reflected in form validation"
 - [DOCUMENTS → me]: "Template changes may affect the Review & Generate tab preview"
+- [2026-04-14 MASTER UPDATE]: New components: WizardStepper (shared across 4 wizard pages, clickable step circles with descriptions, dark mode support), ThemeProvider. Document review toolbar overhauled: Discard, Import, Save, PDF, Regenerate, Approve buttons. Document switching bug fixed (useEffect sync for editContent). "Export All Documents" button added. Per-doc PDF download icons on DocumentsClient, ApplicationEditor, PackageClient. Builder is now 8 tabs (was 7).
 
 ## OUTBOUND IMPACT MAP
 - [me → API]: "New UI features may require new API endpoints or changed contracts"
