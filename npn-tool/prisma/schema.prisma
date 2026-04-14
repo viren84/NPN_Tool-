@@ -233,6 +233,95 @@ model IngredientMonographLink {
 }
 
 // ================================================================
+// PRODUCT PIPELINE (PRE-NPN → NPN → POST-MARKET LIFECYCLE)
+// ================================================================
+
+// 15-stage lifecycle: research → formulation → stability → filing →
+// under_review → approved → production → launch → active →
+// amendment → renewal → suspended → cancelled → archived → withdrawn
+model Product {
+  id                String   @id @default(uuid())
+  name              String
+  brandName         String   @default("")
+  stage             String   @default("research") // 15 stages
+  priority          String   @default("medium")   // low, medium, high, critical
+  assignedTo        String   @default("")
+  companyId         String   @default("")          // multi-company tenant key (VISION #9)
+
+  // Product identity
+  dosageForm        String   @default("")
+  routeOfAdmin      String   @default("")
+  productConcept    String   @default("")
+  targetMarket      String   @default("")          // Canada, USA, EU, Australia, etc.
+
+  // Classification (populated during filing)
+  applicationClass  String   @default("")          // I, II, III
+  submissionType    String   @default("")          // Compendial, Traditional, Non-traditional
+
+  // Regulatory tracking
+  npnNumber         String   @default("")          // assigned after approval
+  applicationId     String?                        // link to PLA Application
+  application       Application? @relation(fields: [applicationId], references: [id])
+  licenceId         String?                        // link to ProductLicence after approval
+  trackingNumber    String   @default("")          // HC submission tracking
+  submissionDate    String   @default("")
+  approvalDate      String   @default("")
+
+  // Review workflow (VISION #3 — Dr. Naresh)
+  reviewStatus      String   @default("none")      // none, requested, in_review, approved, rejected, needs_changes
+  reviewerId        String   @default("")           // Dr. Naresh's user ID
+  reviewNotes       String   @default("")
+  reviewRequestedAt String   @default("")
+  reviewCompletedAt String   @default("")
+
+  // Formulation summary
+  ingredientCount   Int      @default(0)
+  claimCount        Int      @default(0)
+  documentCount     Int      @default(0)
+
+  // Tool 2 handoff (VISION #8)
+  handoffReady      Boolean  @default(false)
+  handoffDate       String   @default("")
+  handoffNotes      String   @default("")
+
+  // Meta
+  notes             String   @default("")
+  tags              String   @default("[]")        // JSON array for flexible categorization
+  createdById       String   @default("")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ================================================================
+// SECURE VAULT (VISION #6 — Owner-Only Document Storage)
+// ================================================================
+
+model SecureVaultItem {
+  id              String   @id @default(uuid())
+  companyId       String   @default("")
+  // What this protects
+  title           String
+  category        String   @default("formula")   // formula, recipe, trade_secret, contract, financial, other
+  description     String   @default("")
+  // File reference
+  filePath        String   @default("")
+  fileName        String   @default("")
+  fileSize        Int      @default(0)
+  encrypted       Boolean  @default(false)
+  // Access control
+  ownerId         String                          // only this user can see by default
+  sharedWith      String   @default("[]")         // JSON array of user IDs with explicit access
+  accessLevel     String   @default("owner_only") // owner_only, shared, team
+  // Audit
+  lastAccessedAt  String   @default("")
+  lastAccessedBy  String   @default("")
+  accessCount     Int      @default(0)
+  // Meta
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// ================================================================
 // PRODUCT LICENCES (ACTIVE NPN MANAGEMENT)
 // ================================================================
 
@@ -390,6 +479,7 @@ model Application {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  products                Product[]
   medicinalIngredients    MedicinalIngredient[]
   nonMedicinalIngredients NonMedicinalIngredient[]
   claims                  Claim[]

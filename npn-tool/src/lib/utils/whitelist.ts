@@ -72,6 +72,24 @@ export const DOCUMENT_FIELDS = [
   "content", "status", "approvedById", "approvedAt",
 ];
 
+export const PRODUCT_FIELDS = [
+  "name", "brandName", "stage", "priority", "assignedTo", "companyId",
+  "dosageForm", "routeOfAdmin", "productConcept", "targetMarket",
+  "applicationClass", "submissionType",
+  "npnNumber", "applicationId", "licenceId", "trackingNumber",
+  "submissionDate", "approvalDate",
+  "reviewStatus", "reviewerId", "reviewNotes",
+  "reviewRequestedAt", "reviewCompletedAt",
+  "ingredientCount", "claimCount", "documentCount",
+  "handoffReady", "handoffDate", "handoffNotes",
+  "notes", "tags",
+];
+
+export const VAULT_FIELDS = [
+  "title", "category", "description",
+  "accessLevel", "sharedWith",
+];
+
 // Validation helpers
 
 export function validateApplicationClass(value: string): boolean {
