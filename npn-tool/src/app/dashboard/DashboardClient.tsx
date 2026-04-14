@@ -4,6 +4,14 @@ import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
 import GlobalSearch from "@/components/GlobalSearch";
 
+interface PipelineProduct {
+  id: string;
+  name: string;
+  stage: string;
+  priority: string;
+  updatedAt: string;
+}
+
 interface Props {
   user: { id: string; name: string; role: string; username: string };
   applications: Array<{
@@ -29,7 +37,9 @@ interface Props {
     activeLicences: number;
     ingredientCount: number;
     submissionCount: number;
+    pipelineProducts: number;
   };
+  pipelineProducts: PipelineProduct[];
 }
 
 const statusColors: Record<string, string> = {
@@ -43,7 +53,18 @@ const statusColors: Record<string, string> = {
   refused: "bg-red-100 text-red-700",
 };
 
-export default function DashboardClient({ user, applications, recentLogs, stats }: Props) {
+const stageColors: Record<string, string> = {
+  research: "bg-blue-100 text-blue-700", formulation: "bg-blue-100 text-blue-700", stability: "bg-blue-100 text-blue-700",
+  filing: "bg-yellow-100 text-yellow-800", under_review: "bg-yellow-100 text-yellow-800",
+  approved: "bg-green-100 text-green-700", production: "bg-green-100 text-green-700", launch: "bg-green-100 text-green-700",
+  active: "bg-green-200 text-green-800", amendment: "bg-purple-100 text-purple-700", renewal: "bg-purple-100 text-purple-700",
+  suspended: "bg-red-100 text-red-700", cancelled: "bg-red-100 text-red-700",
+  archived: "bg-gray-100 text-gray-600", withdrawn: "bg-gray-200 text-gray-700",
+};
+
+function formatStage(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()); }
+
+export default function DashboardClient({ user, applications, recentLogs, stats, pipelineProducts }: Props) {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} />
@@ -69,19 +90,31 @@ export default function DashboardClient({ user, applications, recentLogs, stats 
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-5 gap-4 mb-8">
+        <div className="grid grid-cols-6 gap-4 mb-8">
           {[
-            { label: "PLA Applications", value: stats.totalApplications, color: "text-gray-900" },
-            { label: "Drafts", value: stats.drafts, color: "text-yellow-600" },
-            { label: "Active Licences", value: stats.activeLicences, color: "text-green-600" },
-            { label: "Ingredients KB", value: stats.ingredientCount, color: "text-blue-600" },
-            { label: "NHPID Submissions", value: stats.submissionCount, color: "text-purple-600" },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-5">
-              <p className="text-xs text-gray-500">{stat.label}</p>
-              <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
-            </div>
-          ))}
+            { label: "Pipeline Products", value: stats.pipelineProducts, color: "text-red-600", href: "/products" },
+            { label: "PLA Applications", value: stats.totalApplications, color: "text-gray-900", href: "/applications" },
+            { label: "Drafts", value: stats.drafts, color: "text-yellow-600", href: undefined },
+            { label: "Active Licences", value: stats.activeLicences, color: "text-green-600", href: "/licences" },
+            { label: "Ingredients KB", value: stats.ingredientCount, color: "text-blue-600", href: "/ingredients" },
+            { label: "NHPID Submissions", value: stats.submissionCount, color: "text-purple-600", href: "/ingredient-submissions" },
+          ].map((stat) => {
+            const inner = (
+              <>
+                <p className="text-xs text-gray-500">{stat.label}</p>
+                <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+              </>
+            );
+            return stat.href ? (
+              <Link key={stat.label} href={stat.href} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md hover:border-gray-300 transition-all">
+                {inner}
+              </Link>
+            ) : (
+              <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-5">
+                {inner}
+              </div>
+            );
+          })}
         </div>
 
         <div className="grid grid-cols-3 gap-6">
@@ -140,6 +173,46 @@ export default function DashboardClient({ user, applications, recentLogs, stats 
             </div>
           </div>
         </div>
+
+        {/* Pipeline Products */}
+        {pipelineProducts.length > 0 && (
+          <div className="mt-6 bg-white rounded-xl border border-gray-200">
+            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Product Pipeline</h3>
+              <Link href="/products" className="text-sm text-red-600 hover:text-red-700 font-medium">
+                View all &rarr;
+              </Link>
+            </div>
+            <div className="divide-y divide-gray-50">
+              {pipelineProducts.map((p) => (
+                <Link
+                  key={p.id}
+                  href={`/products/${p.id}`}
+                  className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Updated {new Date(p.updatedAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(p.priority === "high" || p.priority === "critical") && (
+                      <span className={`px-2 py-0.5 text-xs rounded-full ${
+                        p.priority === "critical" ? "bg-red-100 text-red-700" : "bg-orange-100 text-orange-700"
+                      }`}>
+                        {p.priority}
+                      </span>
+                    )}
+                    <span className={`px-2.5 py-1 text-xs rounded-full ${stageColors[p.stage] || "bg-gray-100 text-gray-600"}`}>
+                      {formatStage(p.stage)}
+                    </span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

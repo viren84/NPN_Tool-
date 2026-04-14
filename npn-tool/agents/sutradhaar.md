@@ -53,16 +53,18 @@ When ANY feature touches: medicinal ingredients, claims, dosage, risk informatio
 
 ## MY OPEN RISKS
 - No sprint velocity baseline yet — cannot estimate delivery
-- Vision items 1-3 have undocumented interdependencies
+- Vision items 1-3 interdependencies now documented (see below)
 
 ## INBOUND IMPACT LOG
 - [2026-04-14 MASTER UPDATE]: PDF export feature built (pdf-lib), document review UX overhauled, WizardStepper added, XSS fix, activity feed auth changed, 25 orphaned attachments cleaned. Route count 53→60, test count 110→136, template count 11→13. DOC_LABELS centralized. All agents notified.
+- [2026-04-14 GAP FIX SESSION]: Vision #1 (Product Pipeline), #2 (15-stage lifecycle), #3 (review workflow), #8 (Tool 2 API) all confirmed BUILT — schema, API routes, UI pages, v2 external endpoints exist. Gaps fixed: TS build error (PDF Uint8Array), dashboard now shows pipeline stats, pipeline has search, reviewer picker selects team member (not self), Product→Application bridge added. Route count ~67.
 
 ## OUTBOUND IMPACT MAP
 - [me → ALL AGENTS]: When vision priority order changes, all agents must re-check their improvement queues
 - [me → TESTING]: When agent roster changes, testing must add new tags
 - [me → COMPLIANCE]: When any vision item touches NPN rules, compliance must review before work begins
 - [me → ALL AGENTS 2026-04-14]: Master update — route count now ~60, tests 136, templates 13. PDF export with pdf-lib. Activity feed auth changed to requireAuth.
+- [me → ALL AGENTS 2026-04-14]: Vision #1-3 and #8 are IN PROGRESS, not "not started". Agent docs must be updated to reflect actual state.
 
 ---
 

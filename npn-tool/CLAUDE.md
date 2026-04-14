@@ -9,29 +9,33 @@ This version has breaking changes — APIs, conventions, and file structure may 
 ---
 
 ## CURRENT SPRINT
-_No active sprint. Ready for next vision item._
+_Gap fix session in progress._
 
-Next up: VISION #1 — Product Pipeline (pre-NPN products by name)
-Blocked by: DATABASE agent must design Product model first.
+VISION #1 (Product Pipeline) — BUILT: Schema (27 fields, 15 stages), CRUD API, list page with stage filters + search, detail page with timeline, create modal.
+VISION #2 (15-stage lifecycle) — BUILT: Stages defined, stage transitions in UI, stage filter bar.
+VISION #3 (Review workflow) — BUILT: Review request/decision API, reviewer picker (team member selector), approve/reject/needs_changes UI.
+VISION #8 (Tool 2 API) — BUILT: v2 read-only endpoints with X-API-Key auth.
+
+Next up: VISION #4 (Amendment lifecycle), VISION #6 (Secure Vault access logic), VISION #5 (Monograph sync).
 
 ---
 
 ## OPEN RISKS
 
-| # | Risk | Severity | Owner Agent | Vision # |
-|---|---|---|---|---|
-| 1 | Secure Vault not built — sensitive docs unprotected | HIGH | SECURITY | #6 |
-| 2 | Dr. Naresh review workflow unowned — informal reviews only | HIGH | COMPLIANCE | #3 |
-| 3 | No rate limiting on mutating routes | MEDIUM | API | — |
-| 4 | No AI self-scrutiny — Claude doesn't check its own output | MEDIUM | DOCUMENTS | #10 |
-| 5 | No tenant isolation — multi-company blocked | MEDIUM | DATABASE | #9 |
-| 6 | Product Pipeline has no schema — FEATURE blocked | MEDIUM | DATABASE | #1 |
+| # | Risk | Severity | Owner Agent | Vision # | Status |
+|---|---|---|---|---|---|
+| 1 | Secure Vault access logic not built — schema ready, guards missing | HIGH | SECURITY | #6 | Not started |
+| 2 | No rate limiting on mutating routes | MEDIUM | API | — | Not started |
+| 3 | No AI self-scrutiny — Claude doesn't check its own output | MEDIUM | DOCUMENTS | #10 | Not started |
+| 4 | No tenant isolation — multi-company blocked | MEDIUM | DATABASE | #9 | Not started |
+| 5 | ~~Product Pipeline has no schema~~ | ~~MEDIUM~~ | ~~DATABASE~~ | ~~#1~~ | RESOLVED |
+| 6 | ~~Dr. Naresh review workflow unowned~~ | ~~HIGH~~ | ~~COMPLIANCE~~ | ~~#3~~ | RESOLVED — reviewer picker + decision flow built |
 
 ---
 
 ## API SCHEMA SUMMARY
 
-**~60 API routes** across src/app/api/
+**~67 API routes** across src/app/api/
 
 Core endpoints:
 - POST /api/upload/process — PDF import (Claude extraction → dedup → enrich)
@@ -70,7 +74,7 @@ Current state:
 - Claim validation: BUILT in Application builder (client-side only — no server-side enforcement yet)
 - EN/FR bilingual output: BUILT in all 13 templates
 - Editable PDF export: BUILT (pdf-lib, form fields, single + combined)
-- Dr. Naresh review: NOT BUILT (VISION #3)
+- Dr. Naresh review: BUILT — reviewer picker, request/approve/reject/needs_changes flow (VISION #3)
 - AI self-scrutiny: NOT BUILT (VISION #10)
 - Amendment handling: NOT BUILT (VISION #4)
 - IRN response: NOT BUILT (VISION #12)
@@ -81,11 +85,11 @@ Current state:
 
 | Agent | Domain | Status | Top Priority |
 |---|---|---|---|
-| SUTRADHAAR | Orchestration | Active | Vision dependency mapping |
-| SECURITY | Auth, Vault | Waiting | Build Secure Vault (VISION #6) |
-| DATABASE | Schema, Migrations | Waiting | Product Pipeline schema (VISION #1) |
-| COMPLIANCE | NHPD Rules | Waiting | Dr. Naresh workflow (VISION #3) |
-| API | ~60 Routes, LNHPD Sync | Waiting | Tool 2 read-only API (VISION #8) |
-| FEATURE | UI, 8-Tab Builder, Wizard | Waiting | Product Pipeline view (VISION #1) |
-| TESTING | 136 Tests | GREEN | Add #pipeline tag (VISION #1) |
+| SUTRADHAAR | Orchestration | Active | Agent doc accuracy sweep |
+| SECURITY | Auth, Vault | Waiting | Build Secure Vault access logic (VISION #6) |
+| DATABASE | Schema, Migrations | Done (V#1-3) | Tenant isolation schema (VISION #9) |
+| COMPLIANCE | NHPD Rules | V#3 built | Server-side claim validation |
+| API | ~67 Routes, LNHPD Sync | V#8 built | Rate limiting middleware |
+| FEATURE | UI, Pipeline, Wizard | V#1-2 built | Amendment UI (VISION #4) |
+| TESTING | 136 Tests | GREEN | Add #pipeline, #review tags |
 | DOCUMENTS | 13 Templates, PDF/CSV/Excel | Waiting | AI self-scrutiny (VISION #10) |

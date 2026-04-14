@@ -34,11 +34,18 @@ interface Product {
   handoffReady: boolean; createdAt: string; updatedAt: string;
 }
 
+interface TeamUser {
+  id: string;
+  name: string;
+  role: string;
+}
+
 export default function ProductDetailClient({
-  user, product: initialProduct,
+  user, product: initialProduct, teamUsers = [],
 }: {
   user: { id: string; name: string; role: string; username: string };
   product: Product;
+  teamUsers?: TeamUser[];
 }) {
   const router = useRouter();
   const [product, setProduct] = useState(initialProduct);
@@ -50,6 +57,7 @@ export default function ProductDetailClient({
     targetMarket: product.targetMarket,
   });
 
+  const [selectedReviewerId, setSelectedReviewerId] = useState("");
   const currentIdx = STAGES.indexOf(product.stage as typeof STAGES[number]);
   const isEditable = user.role !== "viewer";
 
@@ -233,20 +241,89 @@ export default function ProductDetailClient({
                   </div>
                 )}
                 {isEditable && product.reviewStatus === "none" && (
-                  <button
-                    onClick={async () => {
-                      await fetch(`/api/products/${product.id}/review`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ reviewerId: user.id }),
-                      });
-                      const r = await fetch(`/api/products/${product.id}`);
-                      if (r.ok) setProduct(await r.json());
-                    }}
-                    className="w-full px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                  >
-                    Request Review
-                  </button>
+                  <div className="space-y-2">
+                    <select
+                      value={selectedReviewerId}
+                      onChange={(e) => setSelectedReviewerId(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg bg-white text-gray-900"
+                    >
+                      <option value="">Select reviewer...</option>
+                      {teamUsers.filter(u => u.id !== user.id).map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.name} ({u.role})
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={async () => {
+                        if (!selectedReviewerId) return;
+                        await fetch(`/api/products/${product.id}/review`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ reviewerId: selectedReviewerId }),
+                        });
+                        const r = await fetch(`/api/products/${product.id}`);
+                        if (r.ok) setProduct(await r.json());
+                      }}
+                      disabled={!selectedReviewerId}
+                      className="w-full px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Request Review
+                    </button>
+                  </div>
+                )}
+                {isEditable && product.reviewStatus === "requested" && product.reviewerId === user.id && (
+                  <div className="space-y-2 pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-500 font-medium">You are the assigned reviewer</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={async () => {
+                          await fetch(`/api/products/${product.id}/review`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ decision: "approved", notes: "" }),
+                          });
+                          const r = await fetch(`/api/products/${product.id}`);
+                          if (r.ok) setProduct(await r.json());
+                        }}
+                        className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const notes = prompt("What changes are needed?");
+                          if (notes === null) return;
+                          await fetch(`/api/products/${product.id}/review`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ decision: "needs_changes", notes }),
+                          });
+                          const r = await fetch(`/api/products/${product.id}`);
+                          if (r.ok) setProduct(await r.json());
+                        }}
+                        className="flex-1 px-3 py-2 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600"
+                      >
+                        Changes
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const notes = prompt("Reason for rejection?");
+                          if (notes === null) return;
+                          await fetch(`/api/products/${product.id}/review`, {
+                            method: "PUT",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ decision: "rejected", notes }),
+                          });
+                          const r = await fetch(`/api/products/${product.id}`);
+                          if (r.ok) setProduct(await r.json());
+                        }}
+                        className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -257,10 +334,43 @@ export default function ProductDetailClient({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-gray-500">Application Class</span><span className="font-medium">{product.applicationClass || "Not set"}</span></div>
                 <div className="flex justify-between"><span className="text-gray-500">NPN Number</span><span className="font-medium">{product.npnNumber || "Pending"}</span></div>
-                {product.applicationId && (
+                {product.applicationId ? (
                   <a href={`/applications/${product.applicationId}`} className="block text-sm text-red-600 hover:text-red-700 font-medium mt-2">
                     View PLA Application &rarr;
                   </a>
+                ) : isEditable && (
+                  <button
+                    onClick={async () => {
+                      const res = await fetch("/api/applications", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          productName: product.name,
+                          brandName: product.brandName,
+                          dosageForm: product.dosageForm,
+                          routeOfAdmin: product.routeOfAdmin,
+                          applicationClass: product.applicationClass || "I",
+                          productConcept: product.productConcept,
+                        }),
+                      });
+                      if (res.ok) {
+                        const app = await res.json();
+                        // Link the product to the new application
+                        await fetch(`/api/products/${product.id}`, {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ applicationId: app.id, stage: "filing" }),
+                        });
+                        router.push(`/applications/${app.id}`);
+                      }
+                    }}
+                    className="w-full mt-3 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center justify-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Create PLA Application
+                  </button>
                 )}
               </div>
             </div>
