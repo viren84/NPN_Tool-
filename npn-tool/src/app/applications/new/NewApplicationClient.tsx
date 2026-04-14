@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import GlobalSearch from "@/components/GlobalSearch";
+import WizardStepper from "@/components/WizardStepper";
 
 const dosageForms = [
   "Capsule", "Tablet", "Softgel", "Liquid", "Powder", "Chewable Tablet",
@@ -13,6 +14,7 @@ const dosageForms = [
 const routes = [
   "Oral", "Topical", "Sublingual", "Nasal", "Inhalation", "Other",
 ];
+
 
 export default function NewApplicationClient({
   user,
@@ -70,22 +72,7 @@ export default function NewApplicationClient({
             </p>
           </div>
 
-          {/* Wizard Progress */}
-          <div className="flex items-center gap-2 mb-8">
-            {["Concept", "Research", "Ingredients", "Confirm", "COAs", "Documents", "Review", "Validate", "Package", "Submit"].map((step, i) => (
-              <div key={step} className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium ${
-                  i === 0 ? "bg-red-600 text-white" : "bg-gray-200 text-gray-500"
-                }`}>
-                  {i + 1}
-                </div>
-                <span className={`text-xs ${i === 0 ? "text-red-700 font-medium" : "text-gray-400"} hidden xl:inline`}>
-                  {step}
-                </span>
-                {i < 9 && <div className="w-4 h-px bg-gray-300" />}
-              </div>
-            ))}
-          </div>
+          <WizardStepper activeStep={0} />
 
           <div className="space-y-6">
             <div className="bg-white rounded-xl border border-gray-200 p-6">

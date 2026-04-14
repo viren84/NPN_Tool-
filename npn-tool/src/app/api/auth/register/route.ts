@@ -24,14 +24,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` }, { status: 400 });
   }
 
+  // First-user-only registration — block if any user already exists
+  const userCount = await prisma.user.count();
+  if (userCount > 0) {
+    return NextResponse.json({ error: "Registration is closed. Contact your admin to add users." }, { status: 403 });
+  }
+
   const existing = await prisma.user.findUnique({ where: { username } });
   if (existing) {
     return NextResponse.json({ error: "Username already taken" }, { status: 409 });
   }
 
-  // First user becomes admin. Subsequent users are always "editor" — only admins can promote via user management.
-  const userCount = await prisma.user.count();
-  const assignedRole = userCount === 0 ? "admin" : "editor"; // NEVER trust client-supplied role
+  const assignedRole = "admin"; // First user is always admin
 
   const hashedPw = await hashPassword(password);
   const user = await prisma.user.create({
@@ -39,7 +43,7 @@ export async function POST(req: NextRequest) {
       username,
       password: hashedPw,
       name,
-      email: email || null,
+      email: typeof email === "string" && email ? email : null,
       role: assignedRole,
     },
   });

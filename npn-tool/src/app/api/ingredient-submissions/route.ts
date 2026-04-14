@@ -34,26 +34,27 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+  const s = (k: string, fb = "") => typeof data[k] === "string" ? (data[k] as string) : fb;
   const submission = await prisma.ingredientSubmission.create({
     data: {
-      ingredientName: data.ingredientName || "",
-      scientificName: data.scientificName || "",
-      casNumber: data.casNumber || "",
-      molecularFormula: data.molecularFormula || "",
-      molecularWeight: data.molecularWeight || null,
-      classification: data.classification || "medicinal",
-      schedule: data.schedule || "",
-      sourceOrganism: data.sourceOrganism || "",
-      sourceOrganismLatin: data.sourceOrganismLatin || "",
-      sourcePart: data.sourcePart || "",
-      extractionMethod: data.extractionMethod || "",
-      proposedProperName: data.proposedProperName || "",
-      proposedCommonName: data.proposedCommonName || "",
-      grasStatus: data.grasStatus || "",
+      ingredientName: s("ingredientName", "New Ingredient"),
+      scientificName: s("scientificName"),
+      casNumber: s("casNumber"),
+      molecularFormula: s("molecularFormula"),
+      molecularWeight: typeof data.molecularWeight === "number" ? data.molecularWeight : null,
+      classification: s("classification", "medicinal"),
+      schedule: s("schedule"),
+      sourceOrganism: s("sourceOrganism"),
+      sourceOrganismLatin: s("sourceOrganismLatin"),
+      sourcePart: s("sourcePart"),
+      extractionMethod: s("extractionMethod"),
+      proposedProperName: s("proposedProperName"),
+      proposedCommonName: s("proposedCommonName"),
+      grasStatus: s("grasStatus"),
       otherJurisdictions: typeof data.otherJurisdictions === "string" ? data.otherJurisdictions : JSON.stringify(data.otherJurisdictions || {}),
       evidencePackageJson: typeof data.evidencePackageJson === "string" ? data.evidencePackageJson : JSON.stringify(data.evidencePackageJson || []),
       precedentIngredientsJson: typeof data.precedentIngredientsJson === "string" ? data.precedentIngredientsJson : JSON.stringify(data.precedentIngredientsJson || []),
-      notes: data.notes || "",
+      notes: s("notes"),
       createdById: user.id,
     },
   });
@@ -61,17 +62,18 @@ export async function POST(req: NextRequest) {
   // Create product strategies if provided
   if (data.productStrategies && Array.isArray(data.productStrategies)) {
     for (const ps of data.productStrategies) {
+      const sp = (k: string, fb = "") => typeof ps[k] === "string" ? (ps[k] as string) : fb;
       await prisma.productStrategy.create({
         data: {
           submissionId: submission.id,
-          productName: ps.productName || "",
-          productType: ps.productType || "single",
-          applicationClass: ps.applicationClass || "III",
-          dosageForm: ps.dosageForm || "",
-          dosageAmount: ps.dosageAmount || "",
+          productName: sp("productName", "New Product"),
+          productType: sp("productType", "single"),
+          applicationClass: sp("applicationClass", "III"),
+          dosageForm: sp("dosageForm"),
+          dosageAmount: sp("dosageAmount"),
           combinationIngredients: typeof ps.combinationIngredients === "string" ? ps.combinationIngredients : JSON.stringify(ps.combinationIngredients || []),
           proposedClaims: typeof ps.proposedClaims === "string" ? ps.proposedClaims : JSON.stringify(ps.proposedClaims || []),
-          targetTimeline: ps.targetTimeline || "",
+          targetTimeline: sp("targetTimeline"),
         },
       });
     }

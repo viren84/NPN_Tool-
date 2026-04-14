@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import GlobalSearch from "@/components/GlobalSearch";
+import WizardStepper from "@/components/WizardStepper";
 
 interface Ingredient {
   properName: string;
@@ -119,6 +120,8 @@ export default function IngredientsClient({
             <h2 className="text-2xl font-bold text-gray-900">{application.productName}</h2>
             <p className="text-sm text-gray-500 mt-1">Step 2-4 — AI Ingredient Research & Confirmation</p>
           </div>
+
+          <WizardStepper activeStep={1} completedSteps={[0]} />
 
           {/* Research Button */}
           {!research && !loading && (

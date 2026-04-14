@@ -18,9 +18,8 @@ function getAllowedRoots(): string[] {
   const roots = [
     path.resolve(cwd, "data"),
     path.resolve(cwd, "data", "attachments"),
-    path.resolve(home, "Downloads"),
-    path.resolve(home, "Documents"),
-    path.resolve(home, "Desktop"),
+    // Entire user home covers Downloads, Documents, Desktop, OneDrive, SharePoint sync folders, etc.
+    home,
   ];
   // Allow env-configured extra roots (comma-separated absolute paths)
   const extra = process.env.SCAN_ALLOWED_ROOTS;

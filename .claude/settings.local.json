@@ -255,7 +255,8 @@
       "Bash(curl -s -b /tmp/npn-cookies.txt \"http://localhost:3000/api/audit-log?action=created\")",
       "Bash(node -e \"const d=JSON.parse\\(require\\('fs'\\).readFileSync\\(0,'utf8'\\)\\);console.log\\('Filtered entries:', d.length, '- all action=created:', d.every\\(e=>e.action==='created'\\)\\)\")",
       "Bash(curl -s -b /tmp/npn-cookies.txt \"http://localhost:3000/api/licences\")",
-      "Bash(curl -s -o /dev/null -w \"Server status: %{http_code}\\\\n\" http://localhost:3000)"
+      "Bash(curl -s -o /dev/null -w \"Server status: %{http_code}\\\\n\" http://localhost:3000)",
+      "Bash(curl -s -o /dev/null -w \"Status: %{http_code}\\\\n\" http://localhost:3000)"
     ]
   }
 }

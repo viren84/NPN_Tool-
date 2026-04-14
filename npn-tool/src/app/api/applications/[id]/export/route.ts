@@ -21,6 +21,30 @@ const DOC_FILENAMES: Record<string, string> = {
   quality_chemistry_report: "13_Quality_Chemistry_Report.html",
 };
 
+// GET — export application as JSON package (all nested relations)
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await getSession();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const application = await prisma.application.findUnique({
+    where: { id },
+    include: {
+      medicinalIngredients: { orderBy: { sortOrder: "asc" } },
+      nonMedicinalIngredients: { orderBy: { sortOrder: "asc" } },
+      claims: { orderBy: { sortOrder: "asc" } },
+      dosageGroups: { orderBy: { sortOrder: "asc" } },
+      riskInfos: { orderBy: { sortOrder: "asc" } },
+      documents: true,
+      supplierCOAs: true,
+      lnhpdPrecedents: true,
+    },
+  });
+
+  if (!application) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json(application);
+}
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

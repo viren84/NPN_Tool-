@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireAdmin, isErrorResponse } from "@/lib/auth/guard";
+import { requireAuth, isErrorResponse } from "@/lib/auth/guard";
 
-// GET — view activity logs (ADMIN ONLY)
+// GET — view activity logs
 export async function GET(req: NextRequest) {
-  const user = await requireAdmin();
+  const user = await requireAuth();
   if (isErrorResponse(user)) return user;
 
   const limit = parseInt(req.nextUrl.searchParams.get("limit") || "100");

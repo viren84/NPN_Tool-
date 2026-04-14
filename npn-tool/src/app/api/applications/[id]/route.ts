@@ -8,7 +8,7 @@ import { handlePrismaError } from "@/lib/errors/handle-prisma";
 
 const VALID_APP_STATUSES = ["draft", "in_review", "submitted", "approved", "rejected", "cancelled", "amendment", "irn_response"];
 
-export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireAuth();
   if (isErrorResponse(user)) return user;
 
@@ -74,5 +74,25 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json(application);
   } catch (err) {
     return handlePrismaError(err, "update application");
+  }
+}
+
+export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const user = await requireEditor();
+  if (isErrorResponse(user)) return user;
+
+  const { id } = await params;
+
+  try {
+    const application = await prisma.application.findUnique({ where: { id } });
+    if (!application) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    await prisma.application.delete({ where: { id } });
+    await logAudit(user.id, "deleted", "application", id,
+      `${user.name} deleted PLA "${application.productName}"`);
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    return handlePrismaError(err, "delete application");
   }
 }

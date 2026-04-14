@@ -3,28 +3,14 @@
 import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import GlobalSearch from "@/components/GlobalSearch";
+import WizardStepper from "@/components/WizardStepper";
+import { DOC_LABELS } from "@/lib/constants/doc-labels";
 
 interface Document {
   id: string;
   documentType: string;
   status: string;
 }
-
-const DOC_LABELS: Record<string, string> = {
-  pla_form: "PLA Form (.html)",
-  cover_letter: "Cover Letter",
-  fps_form: "Finished Product Specifications",
-  label_en: "Product Label (English)",
-  label_fr: "Product Label (French)",
-  monograph_attestation: "Monograph Attestation",
-  safety_report: "Safety Summary Report",
-  efficacy_report: "Efficacy Summary Report",
-  animal_tissue_form: "Animal Tissue Form",
-  senior_attestation: "Senior Official Attestation",
-  ingredient_specs: "Medicinal Ingredient Specifications",
-  non_med_list: "Non-Medicinal Ingredient List",
-  quality_chemistry_report: "Quality/Chemistry Report",
-};
 
 export default function PackageClient({
   user,
@@ -40,6 +26,7 @@ export default function PackageClient({
 }) {
   const [exporting, setExporting] = useState(false);
   const [exported, setExported] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const allApproved = application.documents.every((d) => d.status === "approved");
   const approvedCount = application.documents.filter((d) => d.status === "approved").length;
@@ -54,6 +41,27 @@ export default function PackageClient({
     setExporting(false);
   };
 
+  const handleExportPdf = async () => {
+    setExportingPdf(true);
+    try {
+      const res = await fetch(`/api/applications/${application.id}/export-pdf`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] || "PLA_Package.pdf";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      // silently handle
+    }
+    setExportingPdf(false);
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} />
@@ -65,6 +73,8 @@ export default function PackageClient({
             <h2 className="text-2xl font-bold text-gray-900">{application.productName}</h2>
             <p className="text-sm text-gray-500 mt-1">Step 8-10 — Validate, Package & Submit</p>
           </div>
+
+          <WizardStepper activeStep={7} completedSteps={[0, 1, 2, 3, 4, 5, 6]} />
 
           {/* Completeness Check */}
           <div className={`rounded-xl border p-6 mb-6 ${allApproved ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}>
@@ -95,9 +105,18 @@ export default function PackageClient({
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-2a6 6 0 100-12 6 6 0 000 12z" clipRule="evenodd" />
                     </svg>
                   )}
-                  <span className={doc.status === "approved" ? "text-green-800" : "text-gray-600"}>
+                  <span className={`flex-1 ${doc.status === "approved" ? "text-green-800" : "text-gray-600"}`}>
                     {DOC_LABELS[doc.documentType] || doc.documentType}
                   </span>
+                  <a
+                    href={`/api/applications/${application.id}/export-pdf?docType=${doc.documentType}`}
+                    className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors"
+                    title="Download as PDF"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </a>
                 </div>
               ))}
             </div>
@@ -108,18 +127,33 @@ export default function PackageClient({
             <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
               <h3 className="font-semibold text-gray-900 mb-3">Export Submission Package</h3>
               <p className="text-sm text-gray-600 mb-4">
-                Creates a folder with all documents organized for ePost Connect submission.
+                Export all documents as HTML files for ePost Connect, or as an editable PDF for review.
               </p>
-              <button
-                onClick={handleExport}
-                disabled={exporting}
-                className="px-6 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
-              >
-                {exporting ? "Exporting..." : exported ? "Exported!" : "Export Package"}
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleExport}
+                  disabled={exporting}
+                  className="px-6 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  {exporting ? "Exporting..." : exported ? "Exported!" : "Export HTML Package"}
+                </button>
+                <button
+                  onClick={handleExportPdf}
+                  disabled={exportingPdf}
+                  className="px-6 py-2.5 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 disabled:opacity-50 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {exportingPdf ? "Generating PDF..." : "Export Editable PDF"}
+                </button>
+              </div>
               {exported && (
                 <p className="text-sm text-green-600 mt-3">
-                  Package exported. Check your export folder.
+                  HTML package exported. Check your export folder.
                 </p>
               )}
             </div>
