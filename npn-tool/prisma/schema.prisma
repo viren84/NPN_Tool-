@@ -248,6 +248,10 @@ model Product {
   assignedTo        String   @default("")
   companyId         String   @default("")          // multi-company tenant key (VISION #9)
 
+  // Condition-centric (what health problem does this product solve?)
+  targetCondition   String   @default("")          // stress, joint_health, heart_health, sleep, immune, digestion, energy, weight, skin, cognitive, etc.
+  targetConditionDetail String @default("")        // free-text elaboration: "chronic stress in working adults 25-45"
+
   // Product identity
   dosageForm        String   @default("")
   routeOfAdmin      String   @default("")
@@ -290,6 +294,213 @@ model Product {
   createdById       String   @default("")
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+
+  // Relations (Product Development Intelligence)
+  productDocuments     ProductDocument[]
+  competitors          CompetitorProduct[]
+  ingredientSpecs      ProductIngredientSpec[]
+  stageData            ProductStageData[]
+  aiResearchSessions   AIResearchSession[]
+  conditionStacks      ConditionStack[]
+}
+
+// ================================================================
+// CONDITION STACKS (Molecule Combinations Per Health Condition)
+// ================================================================
+
+model ConditionStack {
+  id                   String   @id @default(uuid())
+  productId            String
+  product              Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // Condition targeting
+  condition            String   @default("")              // stress, joint_health, heart_health, sleep, immune, etc.
+  conditionDetail      String   @default("")              // specific sub-condition
+  // Stack identity
+  stackName            String   @default("")              // "Adaptogen Calm Stack", "Joint Repair Trio"
+  stackType            String   @default("custom")        // ai_suggested, market_validated, custom, clinical_proven
+  // Molecules in this stack
+  primaryMolecule      String   @default("")              // the star ingredient name
+  primaryDose          Float    @default(0)
+  primaryUnit          String   @default("mg")
+  moleculesJson        String   @default("[]")            // [{name, dose, unit, role, synergy_reason, monograph_name}]
+  // role: bioavailability_enhancer, synergistic_pair, cofactor, complementary, stability_partner, differentiator
+  // Market intelligence
+  marketPrevalence     Int      @default(0)               // approx # products with this combo
+  avgMarketRating      Float    @default(0)
+  marketGap            String   @default("")              // what's missing in current market offerings
+  consumerPainPoints   String   @default("[]")            // JSON: complaints this stack addresses
+  // Regulatory
+  applicationClass     String   @default("")              // I, II, III — determined by weakest ingredient
+  monographCoverage    String   @default("")              // full, partial, none
+  availableClaimsJson  String   @default("[]")            // claims unlocked by this specific combination
+  complianceNotes      String   @default("")
+  // AI metadata
+  aiGenerated          Boolean  @default(false)
+  aiConfidence         Float    @default(0)               // 0-1
+  scientificBasis      String   @default("")              // why these molecules work together
+  // Status
+  selected             Boolean  @default(false)           // user picked this stack for the product
+  notes                String   @default("")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([productId, condition])
+}
+
+// ================================================================
+// PRODUCT DOCUMENTS (Stage-Scoped Uploads + AI Extraction)
+// ================================================================
+
+model ProductDocument {
+  id                   String   @id @default(uuid())
+  productId            String
+  product              Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stage                String   @default("")          // which lifecycle stage
+  docType              String   @default("other")     // coa, supplier_spec, competitor_label, market_report, study, marketing_material, other
+  title                String   @default("")
+  fileName             String   @default("")
+  fileType             String   @default("")          // pdf, jpg, png, xlsx, csv, txt
+  fileSize             Int      @default(0)
+  filePath             String   @default("")
+  // AI extraction
+  extractedDataJson    String   @default("{}")        // Claude-extracted structured data
+  extractionStatus     String   @default("pending")   // pending, processing, completed, failed
+  extractionError      String   @default("")
+  // Meta
+  uploadedById         String   @default("")
+  notes                String   @default("")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([productId, stage])
+}
+
+// ================================================================
+// COMPETITOR PRODUCTS (Amazon/Website Research)
+// ================================================================
+
+model CompetitorProduct {
+  id                   String    @id @default(uuid())
+  productId            String
+  product              Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // Source
+  sourceUrl            String    @default("")          // Amazon URL or website
+  sourceType           String    @default("amazon")    // amazon, website, retail
+  // Identity
+  competitorName       String    @default("")
+  productName          String    @default("")
+  brand                String    @default("")
+  companyWebsite       String    @default("")
+  // Product data
+  ingredientsJson      String    @default("[]")        // [{name, amount, unit, type}]
+  claimsJson           String    @default("[]")        // marketing claims
+  price                String    @default("")
+  dosageForm           String    @default("")
+  servingSize          String    @default("")
+  servingsPerContainer String    @default("")
+  certifications       String    @default("[]")        // JSON: ["organic", "non-gmo", "gmp"]
+  // Review analysis
+  reviewSummaryJson    String    @default("{}")         // {avgRating, totalReviews, topComplaints, topPraises, sentimentScore}
+  // Market intelligence
+  marketingStrategy    String    @default("")
+  socialPresence       String    @default("")
+  strengthsJson        String    @default("[]")
+  weaknessesJson       String    @default("[]")
+  opportunitiesJson    String    @default("[]")
+  nhpComplianceNotes   String    @default("")
+  // Status
+  analysisStatus       String    @default("pending")   // pending, analyzing, completed, failed
+  analysisError        String    @default("")
+  analyzedAt           String    @default("")
+  notes                String    @default("")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([productId])
+}
+
+// ================================================================
+// PRODUCT INGREDIENT SPECS (Formulation-Stage Tracking)
+// ================================================================
+
+model ProductIngredientSpec {
+  id                   String   @id @default(uuid())
+  productId            String
+  product              Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sortOrder            Int      @default(0)
+  // Identity
+  ingredientName       String   @default("")
+  properName           String   @default("")
+  commonName           String   @default("")
+  scientificName       String   @default("")
+  ingredientType       String   @default("medicinal") // medicinal, non_medicinal
+  // Sourcing
+  supplierName         String   @default("")
+  supplierCountry      String   @default("")
+  coaDocumentId        String   @default("")          // link to ProductDocument
+  // Formulation
+  targetDose           Float    @default(0)
+  targetUnit           String   @default("mg")
+  doseRangeMin         Float    @default(0)
+  doseRangeMax         Float    @default(0)
+  // Spec
+  standardization      String   @default("")
+  extractRatio         String   @default("")
+  sourceOrganism       String   @default("")
+  partUsed             String   @default("")
+  // Monograph compliance
+  monographName        String   @default("")
+  monographCompliant   Boolean  @default(false)
+  // COA data (from AI extraction)
+  coaDataJson          String   @default("{}")        // parsed COA test results
+  // Status
+  status               String   @default("draft")     // draft, sourced, spec_confirmed, approved
+  notes                String   @default("")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([productId])
+}
+
+// ================================================================
+// PRODUCT STAGE DATA (Dynamic Per-Stage Sections)
+// ================================================================
+
+model ProductStageData {
+  id                   String    @id @default(uuid())
+  productId            String
+  product              Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stage                String                          // research, formulation, stability, etc.
+  sectionKey           String    @default("")          // competitor_analysis, market_gaps, ingredient_ideas, etc.
+  dataJson             String    @default("{}")        // flexible structured JSON
+  aiGeneratedAt        String    @default("")          // when AI last populated
+  manualOverride       Boolean   @default(false)       // user edited AI output
+  notes                String    @default("")
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([productId, stage, sectionKey])
+}
+
+// ================================================================
+// AI RESEARCH SESSIONS (Audit Trail for AI Calls)
+// ================================================================
+
+model AIResearchSession {
+  id                   String   @id @default(uuid())
+  productId            String
+  product              Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stage                String   @default("")
+  researchType         String   @default("")          // competitor_analysis, ingredient_research, market_analysis, regulatory_gap, monograph_compliance
+  promptSummary        String   @default("")          // truncated prompt
+  responseJson         String   @default("{}")        // full AI response
+  tokensUsed           Int      @default(0)
+  modelUsed            String   @default("claude-sonnet-4-6")
+  status               String   @default("completed") // completed, failed, partial
+  createdById          String   @default("")
+  createdAt            DateTime @default(now())
+
+  @@index([productId, stage])
 }
 
 // ================================================================
@@ -359,6 +570,8 @@ model ProductLicence {
   risksJson                String @default("[]")
   dosesJson                String @default("[]")
   routesJson               String @default("[]")
+  // Health condition classification (AI-derived + user-editable)
+  healthConditionsJson     String @default("[]") // ["immune","cardiovascular","antioxidant"]
   // Files
   licencePdfPath        String   @default("")
   labelTextPath         String   @default("")

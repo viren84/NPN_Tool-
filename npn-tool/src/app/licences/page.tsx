@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Sidebar from "@/components/Sidebar";
 import GlobalSearch from "@/components/GlobalSearch";
+import { HEALTH_CONDITIONS, CONDITION_KEYS } from "@/lib/constants/health-conditions";
 
 // Types
 interface Licence {
@@ -13,6 +14,7 @@ interface Licence {
   lnhpdId: string; licencePdfPath: string; notes: string;
   medicinalIngredientsJson: string; nonMedIngredientsJson: string;
   claimsJson: string; risksJson: string; dosesJson: string;
+  healthConditionsJson: string;
   amendments: Array<{ id: string; amendmentType: string; status: string; description: string }>;
 }
 
@@ -52,6 +54,8 @@ export default function LicencesPage() {
   const [licences, setLicences] = useState<Licence[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [activeCondition, setActiveCondition] = useState<string | null>(null);
+  const [classifying, setClassifying] = useState(false);
 
   // Import modal
   const [showImport, setShowImport] = useState(false);
@@ -591,7 +595,48 @@ export default function LicencesPage() {
 
   const activeCount = licences.filter(l => l.productStatus === "active").length;
   const archivedCount = licences.filter(l => l.productStatus !== "active").length;
-  const allSelected = licences.length > 0 && selectedIds.size === licences.length;
+
+  // Condition filtering + search
+  const getConditions = (lic: Licence): string[] => {
+    try { return JSON.parse(lic.healthConditionsJson || "[]"); } catch { return []; }
+  };
+  const conditionCounts: Record<string, number> = {};
+  for (const key of CONDITION_KEYS) conditionCounts[key] = 0;
+  let unclassifiedCount = 0;
+  for (const lic of licences) {
+    const conds = getConditions(lic);
+    if (conds.length === 0) unclassifiedCount++;
+    for (const c of conds) if (conditionCounts[c] !== undefined) conditionCounts[c]++;
+  }
+  const usedConditions = CONDITION_KEYS.filter(k => conditionCounts[k] > 0);
+
+  const filteredLicences = licences.filter(lic => {
+    // Condition filter
+    if (activeCondition === "__unclassified") {
+      if (getConditions(lic).length > 0) return false;
+    } else if (activeCondition) {
+      if (!getConditions(lic).includes(activeCondition)) return false;
+    }
+    // Search filter
+    if (search) {
+      const q = search.toLowerCase();
+      if (!lic.licenceNumber.toLowerCase().includes(q) && !lic.productName.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  const allSelected = filteredLicences.length > 0 && selectedIds.size === filteredLicences.length;
+
+  const classifyAll = async () => {
+    setClassifying(true);
+    try {
+      await fetch("/api/licences/classify-conditions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      // Reload licences
+      const res = await fetch("/api/licences");
+      if (res.ok) setLicences(await res.json());
+    } catch { /* silently handle */ }
+    setClassifying(false);
+  };
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -599,7 +644,7 @@ export default function LicencesPage() {
       <GlobalSearch />
 
       {/* Main Content */}
-      <main className="flex-1 ml-64 p-6 min-w-0 transition-all">
+      <main className="flex-1 p-6 min-w-0 transition-all">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -626,7 +671,44 @@ export default function LicencesPage() {
         {/* Search */}
         <input type="text" value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Search by NPN or product name..."
-          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm mb-4 bg-white" />
+          className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm mb-3 bg-white" />
+
+        {/* Health Condition Filter Bar */}
+        <div className="mb-4 overflow-x-auto">
+          <div className="flex items-center gap-2 pb-1 min-w-max">
+            <button onClick={() => setActiveCondition(null)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                activeCondition === null ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}>
+              All ({licences.length})
+            </button>
+            {usedConditions.map(key => {
+              const cond = HEALTH_CONDITIONS[key];
+              const isActive = activeCondition === key;
+              return (
+                <button key={key} onClick={() => setActiveCondition(isActive ? null : key)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                    isActive ? "bg-gray-800 text-white" : cond.color + " hover:opacity-80"
+                  }`}>
+                  {cond.label} ({conditionCounts[key]})
+                </button>
+              );
+            })}
+            {unclassifiedCount > 0 && (
+              <button onClick={() => setActiveCondition(activeCondition === "__unclassified" ? null : "__unclassified")}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                  activeCondition === "__unclassified" ? "bg-gray-800 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                }`}>
+                Unclassified ({unclassifiedCount})
+              </button>
+            )}
+            <button onClick={classifyAll} disabled={classifying}
+              className="px-3 py-1.5 text-xs font-medium rounded-full bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:opacity-50 flex items-center gap-1 ml-2">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+              {classifying ? "Classifying..." : "AI Classify"}
+            </button>
+          </div>
+        </div>
 
         {/* Bulk Action Toolbar — appears when rows are selected */}
         {selectedIds.size > 0 && (
@@ -670,13 +752,13 @@ export default function LicencesPage() {
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 <tr><td colSpan={8} className="px-4 py-12 text-center text-sm text-gray-400">Loading...</td></tr>
-              ) : licences.length === 0 ? (
+              ) : filteredLicences.length === 0 ? (
                 <tr><td colSpan={8} className="px-4 py-16 text-center">
                   <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                   <p className="text-sm text-gray-400 mb-2">No licences imported yet</p>
                   <button onClick={() => setShowImport(true)} className="text-sm bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 font-medium">Import from PDFs</button>
                 </td></tr>
-              ) : licences.map(lic => {
+              ) : filteredLicences.map(lic => {
                 const isArchived = lic.productStatus !== "active";
                 const isChecked = selectedIds.has(lic.id);
                 const dotColor = lic.productStatus === "active" ? "text-green-500" : lic.productStatus === "cancelled" ? "text-red-500" : lic.productStatus === "suspended" ? "text-yellow-500" : "text-gray-400";
@@ -695,8 +777,14 @@ export default function LicencesPage() {
                   </td>
                   <td className="px-3 py-2.5 text-sm font-mono text-blue-600 font-medium">{lic.licenceNumber}</td>
                   <td className="px-3 py-2.5 text-sm text-gray-900">
-                    {lic.productName}
-                    {isArchived && <span className="ml-2 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">archived</span>}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {lic.productName}
+                      {isArchived && <span className="text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded">archived</span>}
+                      {getConditions(lic).map(c => {
+                        const cond = HEALTH_CONDITIONS[c];
+                        return cond ? <span key={c} className={`text-[10px] px-1.5 py-0.5 rounded-full ${cond.color}`}>{cond.label}</span> : null;
+                      })}
+                    </div>
                   </td>
                   <td className="px-3 py-2.5 text-sm text-gray-600">{lic.dosageForm}</td>
                   <td className="px-3 py-2.5 text-sm text-gray-600">{lic.applicationClass}</td>
