@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
     const tag = (path: string) => { dataSources[path] = "imported"; };
 
     tag("productName");
-    const appClass = getField("application_class") || getField("applicationclass") || "I";
+    const rawClass = getField("application_class") || getField("applicationclass") || "I";
+    const appClass = ["I", "II", "III"].includes(rawClass) ? rawClass : "I";
     if (appClass) tag("applicationClass");
     const dosageForm = getField("dosage_form") || getField("dosageform");
     if (dosageForm) tag("dosageForm");
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
         productName,
         brandName: getField("brand_name") || getField("brandname") || "",
         applicationClass: appClass,
-        applicationType: getField("application_type") || getField("applicationtype") || "Compendial",
+        applicationType: ((): string => { const t = getField("application_type") || getField("applicationtype") || "Compendial"; return ["Compendial", "Traditional", "Non-traditional"].includes(t) ? t : "Compendial"; })(),
         dosageForm,
         routeOfAdmin,
         productConcept,

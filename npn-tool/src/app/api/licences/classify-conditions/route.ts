@@ -101,7 +101,8 @@ Return ONLY valid JSON like: [["immune","antioxidant"],["cardiovascular"],["join
       // Extract JSON array from response
       const match = response.match(/\[[\s\S]*\]/);
       if (match) {
-        const parsed = JSON.parse(match[0]) as string[][];
+        let parsed: string[][];
+        try { parsed = JSON.parse(match[0]) as string[][]; } catch { continue; }
         for (let j = 0; j < batch.length && j < parsed.length; j++) {
           const conditions = parsed[j].filter((c: string) => CONDITION_KEYS.includes(c));
           if (conditions.length > 0) {

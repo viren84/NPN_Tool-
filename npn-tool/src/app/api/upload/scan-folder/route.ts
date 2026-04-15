@@ -89,9 +89,7 @@ export async function POST(req: NextRequest) {
     const productFolders: Array<{ name: string; fullPath: string }> = [];
     await findProductFolders(normalizedPath, productFolders);
 
-    console.log(`[Scan] Found ${productFolders.length} product folders with PDFs`);
 
-    console.log(`[Scan] Found ${productFolders.length} product folders in ${normalizedPath}`);
 
     const results: Array<{
       folder: string;
@@ -127,7 +125,6 @@ export async function POST(req: NextRequest) {
             const label = pdfFile.toUpperCase().startsWith("IL") ? "ISSUANCE LETTER" :
               pdfFile.toUpperCase().startsWith("PL") ? "PRODUCT LICENCE" : "DOCUMENT";
             combinedText += `\n=== ${label} (${pdfFile}) ===\n${text}\n`;
-            console.log(`[Scan] Read ${pdfFile}: ${text.length} chars`);
           } catch (e) {
             console.error(`[Scan] Failed to read ${pdfFile}:`, e);
           }
@@ -139,7 +136,6 @@ export async function POST(req: NextRequest) {
         }
 
         // AI extraction
-        console.log(`[Scan] AI extracting "${folder.name}" (${combinedText.length} chars)`);
         let extracted: Record<string, unknown>;
         try {
           extracted = await extractLicencePDF(combinedText);
@@ -174,7 +170,6 @@ export async function POST(req: NextRequest) {
             pdfFiles: pdfFiles,
             existingLicenceId: existing?.id,
           });
-          console.log(`[Scan-Preview] ${existing ? "Duplicate" : "New"} NPN ${licenceNum} — ${extracted.productName}`);
         } else {
           // LIVE MODE: write to DB (existing behavior)
 
@@ -191,7 +186,6 @@ export async function POST(req: NextRequest) {
                   notes: `[ARCHIVED-DUPLICATE] Replaced by newer import on ${new Date().toISOString().slice(0, 10)}. ${existing.notes}`,
                 },
               });
-              console.log(`[Scan] Archived duplicate NPN ${licenceNum}`);
               results.push({
                 folder: folder.name,
                 status: "duplicate_archived",
@@ -234,7 +228,6 @@ export async function POST(req: NextRequest) {
             productName: extracted.productName as string,
           });
 
-          console.log(`[Scan] Imported NPN ${licenceNum} — ${extracted.productName}`);
         }
       } catch (e) {
         console.error(`[Scan] Error for "${folder.name}":`, e);

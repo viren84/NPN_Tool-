@@ -74,6 +74,13 @@ export async function POST(
       return NextResponse.json({ error: "File too large. Max 50MB." }, { status: 400 });
     }
 
+    // File type validation
+    const allowedExts = ["pdf", "xlsx", "xls", "csv", "doc", "docx", "jpg", "jpeg", "png", "txt"];
+    const fileExt = file.name.split(".").pop()?.toLowerCase() || "";
+    if (!allowedExts.includes(fileExt)) {
+      return NextResponse.json({ error: `File type .${fileExt} not allowed. Accepted: ${allowedExts.join(", ")}` }, { status: 400 });
+    }
+
     // Save file to disk
     const dir = path.join(process.cwd(), "data", "attachments", "product", id);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });

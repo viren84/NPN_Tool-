@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from "react";
 interface Competitor {
   id: string; productName: string; brand: string; competitorName: string;
   sourceUrl: string; price: string; dosageForm: string; analysisStatus: string;
+  analysisError: string; analyzedAt: string;
   marketingStrategy: string; ingredientsJson: string; reviewSummaryJson: string;
   strengthsJson: string; weaknessesJson: string; opportunitiesJson: string;
 }
@@ -29,6 +30,7 @@ export default function ResearchTab({ productId, isEditable }: { productId: stri
   const [stacks, setStacks] = useState<ConditionStack[]>([]);
   const [sessions, setSessions] = useState<AISession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [addingComp, setAddingComp] = useState(false);
   const [discoveringStacks, setDiscoveringStacks] = useState(false);
   const [compForm, setCompForm] = useState({ sourceUrl: "", productName: "", competitorName: "", pastedContent: "" });
@@ -39,12 +41,15 @@ export default function ResearchTab({ productId, isEditable }: { productId: stri
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const [c, s, a] = await Promise.all([
-      fetch(`/api/products/${productId}/competitors`).then(r => r.ok ? r.json() : []),
-      fetch(`/api/products/${productId}/condition-stacks`).then(r => r.ok ? r.json() : []),
-      fetch(`/api/products/${productId}/ai-research`).then(r => r.ok ? r.json() : []),
-    ]);
-    setCompetitors(c); setStacks(s); setSessions(a);
+    setError("");
+    try {
+      const [c, s, a] = await Promise.all([
+        fetch(`/api/products/${productId}/competitors`).then(r => r.ok ? r.json() : []),
+        fetch(`/api/products/${productId}/condition-stacks`).then(r => r.ok ? r.json() : []),
+        fetch(`/api/products/${productId}/ai-research`).then(r => r.ok ? r.json() : []),
+      ]);
+      setCompetitors(c); setStacks(s); setSessions(a);
+    } catch { setError("Failed to load research data"); }
     setLoading(false);
   }, [productId]);
 
@@ -53,13 +58,16 @@ export default function ResearchTab({ productId, isEditable }: { productId: stri
   const addCompetitor = async () => {
     if (!compForm.productName && !compForm.sourceUrl) return;
     setAddingComp(true);
-    await fetch(`/api/products/${productId}/competitors`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(compForm),
-    });
-    setCompForm({ sourceUrl: "", productName: "", competitorName: "", pastedContent: "" });
-    setShowCompForm(false);
+    setError("");
+    try {
+      const r = await fetch(`/api/products/${productId}/competitors`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(compForm),
+      });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); setError(d.error || "Failed to add competitor"); }
+      else { setCompForm({ sourceUrl: "", productName: "", competitorName: "", pastedContent: "" }); setShowCompForm(false); }
+    } catch { setError("Network error adding competitor"); }
     setAddingComp(false);
     reload();
   };
@@ -67,28 +75,36 @@ export default function ResearchTab({ productId, isEditable }: { productId: stri
   const discoverStacks = async () => {
     if (!stackForm.primaryMolecule) return;
     setDiscoveringStacks(true);
-    await fetch(`/api/products/${productId}/condition-stacks`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...stackForm,
-        primaryDose: parseFloat(stackForm.primaryDose) || 0,
-        primaryUnit: "mg",
-        aiSuggest: true,
-      }),
-    });
+    setError("");
+    try {
+      const r = await fetch(`/api/products/${productId}/condition-stacks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...stackForm,
+          primaryDose: parseFloat(stackForm.primaryDose) || 0,
+          primaryUnit: "mg",
+          aiSuggest: true,
+        }),
+      });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); setError(d.error || "AI discovery failed"); }
+      else setShowStackForm(false);
+    } catch { setError("Network error during AI discovery"); }
     setDiscoveringStacks(false);
-    setShowStackForm(false);
     reload();
   };
 
   const runResearch = async (type: string) => {
     setRunningResearch(type);
-    await fetch(`/api/products/${productId}/ai-research`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ researchType: type }),
-    });
+    setError("");
+    try {
+      const r = await fetch(`/api/products/${productId}/ai-research`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ researchType: type }),
+      });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); setError(d.error || `${type} research failed`); }
+    } catch { setError("Network error during research"); }
     setRunningResearch("");
     reload();
   };
@@ -97,6 +113,7 @@ export default function ResearchTab({ productId, isEditable }: { productId: stri
 
   return (
     <div className="space-y-6">
+      {error && <div className="p-3 text-sm text-red-700 bg-red-50 rounded-lg border border-red-200">{error}</div>}
       {/* AI Research Quick Actions */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <h3 className="font-semibold text-gray-900 mb-3">AI Research</h3>

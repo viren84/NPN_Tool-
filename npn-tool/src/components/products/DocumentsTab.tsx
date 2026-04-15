@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 interface ProductDoc {
   id: string; title: string; fileName: string; fileType: string; fileSize: number;
-  stage: string; docType: string; extractionStatus: string; extractedDataJson: string;
-  createdAt: string;
+  stage: string; docType: string; extractionStatus: string; extractionError: string;
+  extractedDataJson: string; createdAt: string;
 }
 
 const DOC_TYPES = ["coa", "supplier_spec", "study", "marketing_material", "competitor_label", "market_report", "other"];
@@ -20,26 +20,42 @@ export default function DocumentsTab({ productId, productStage, isEditable }: { 
   const [docs, setDocs] = useState<ProductDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState("");
   const [docType, setDocType] = useState("other");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
-    const r = await fetch(`/api/products/${productId}/documents`);
-    if (r.ok) setDocs(await r.json());
+    setError("");
+    try {
+      const r = await fetch(`/api/products/${productId}/documents`);
+      if (r.ok) setDocs(await r.json());
+      else setError("Failed to load documents");
+    } catch { setError("Network error loading documents"); }
     setLoading(false);
   }, [productId]);
 
   useEffect(() => { reload(); }, [reload]);
 
+  const ALLOWED_TYPES = ["pdf", "xlsx", "xls", "csv", "doc", "docx", "jpg", "jpeg", "png", "txt"];
+
   const upload = async (file: File) => {
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (!ALLOWED_TYPES.includes(ext)) {
+      setError(`File type .${ext} not allowed. Accepted: ${ALLOWED_TYPES.join(", ")}`);
+      return;
+    }
     setUploading(true);
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("stage", productStage);
-    fd.append("docType", docType);
-    fd.append("title", file.name);
-    await fetch(`/api/products/${productId}/documents`, { method: "POST", body: fd });
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("stage", productStage);
+      fd.append("docType", docType);
+      fd.append("title", file.name);
+      const r = await fetch(`/api/products/${productId}/documents`, { method: "POST", body: fd });
+      if (!r.ok) { const d = await r.json().catch(() => ({})); setError(d.error || "Upload failed"); }
+    } catch { setError("Network error during upload"); }
     setUploading(false);
     reload();
   };
@@ -53,6 +69,7 @@ export default function DocumentsTab({ productId, productStage, isEditable }: { 
 
   return (
     <div className="space-y-6">
+      {error && <div className="p-3 text-sm text-red-700 bg-red-50 rounded-lg border border-red-200">{error}</div>}
       {/* Upload section */}
       {isEditable && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">

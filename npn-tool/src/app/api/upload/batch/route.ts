@@ -35,7 +35,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No files uploaded", totalFiles: 0, totalGroups: 0, results: [] }, { status: 400 });
     }
 
-    console.log(`[Batch] Received ${allFiles.length} files`);
 
     // Group files by folder
     const groups: Map<string, FileGroup> = new Map();
@@ -44,7 +43,6 @@ export async function POST(req: NextRequest) {
       if (!file.name.toLowerCase().endsWith(".pdf")) continue;
 
       const buffer = Buffer.from(await file.arrayBuffer());
-      console.log(`[Batch] Reading ${file.name} (${buffer.length} bytes)`);
       let text = "";
       try {
         text = await extractTextFromPDF(buffer);
@@ -53,7 +51,6 @@ export async function POST(req: NextRequest) {
         // Skip this file but continue processing others
         continue;
       }
-      console.log(`[Batch] Extracted ${text.length} chars from ${file.name}`);
 
       if (!text || text.trim().length < 20) continue;
 
@@ -74,7 +71,6 @@ export async function POST(req: NextRequest) {
       groups.get(folderName)!.files.push({ name: file.name, text, type: fileType });
     }
 
-    console.log(`[Batch] ${groups.size} product groups`);
 
     const results: Array<{
       folderName: string; fileCount: number;
@@ -89,7 +85,6 @@ export async function POST(req: NextRequest) {
         const otherTexts = group.files.filter(f => f.type === "other").map(f => `=== ${f.name} ===\n${f.text}`);
         const combinedText = [...ilTexts, ...plTexts, ...otherTexts].join("\n\n");
 
-        console.log(`[Batch] AI extracting "${group.folderName}" (${combinedText.length} chars)`);
         const extracted = await extractLicencePDF(combinedText);
 
         // Check if AI returned an error object instead of data
