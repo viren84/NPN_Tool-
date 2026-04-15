@@ -51,7 +51,7 @@ interface Product {
   handoffReady: boolean; createdAt: string; updatedAt: string;
 }
 interface TeamUser { id: string; name: string; role: string; }
-interface ProductDoc { id: string; stage: string; docType: string; title: string; fileName: string; fileSize: number; extractionStatus: string; extractedDataJson: string; createdAt: string; }
+interface ProductDoc { id: string; stage: string; docType: string; title: string; fileName: string; fileSize: number; filePath: string; extractionStatus: string; extractedDataJson: string; createdAt: string; }
 // ── Component ──
 export default function ProductDetailClient({
   user, product: initialProduct, teamUsers = [],
@@ -286,6 +286,19 @@ export default function ProductDetailClient({
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {doc.filePath && (
+                          <>
+                            <a href={`/api/files/view?path=${encodeURIComponent(doc.filePath)}`} target="_blank" rel="noopener noreferrer"
+                              className="px-2 py-1 text-xs bg-blue-50 text-blue-700 rounded hover:bg-blue-100 font-medium">View</a>
+                            <a href={`/api/files/download?path=${encodeURIComponent(doc.filePath)}`}
+                              className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 font-medium">Download</a>
+                          </>
+                        )}
+                        <button onClick={async () => {
+                          if (!confirm(`Delete "${doc.fileName}"?`)) return;
+                          const res = await fetch(`/api/products/${product.id}/documents/${doc.id}`, { method: "DELETE" });
+                          if (res.ok) setDocs(prev => prev.filter(d => d.id !== doc.id));
+                        }} className="px-2 py-1 text-xs bg-red-50 text-red-700 rounded hover:bg-red-100 font-medium">Delete</button>
                         <span className={`px-2 py-0.5 text-xs rounded-full ${extractionBadge(doc.extractionStatus)}`}>{doc.extractionStatus}</span>
                         <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{doc.docType}</span>
                       </div>
