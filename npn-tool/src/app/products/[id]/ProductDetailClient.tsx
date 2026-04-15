@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import GlobalSearch from "@/components/GlobalSearch";
+import { DEFAULT_RESEARCH_PROMPTS, fillPromptTemplate } from "@/lib/constants/research-prompts";
 
 // ── Constants ──
 const STAGES = [
@@ -63,8 +64,6 @@ interface Product {
 }
 interface TeamUser { id: string; name: string; role: string; }
 interface ProductDoc { id: string; stage: string; docType: string; title: string; fileName: string; fileSize: number; extractionStatus: string; extractedDataJson: string; createdAt: string; }
-interface ResearchSession { id: string; stage: string; researchType: string; responseJson: string; status: string; createdAt: string; }
-
 // ── Component ──
 export default function ProductDetailClient({
   user, product: initialProduct, teamUsers = [],
@@ -91,11 +90,8 @@ export default function ProductDetailClient({
   const [uploadDocType, setUploadDocType] = useState("other");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // AI Research state
-  const [sessions, setSessions] = useState<ResearchSession[]>([]);
+  // Prompt generator state
   const [researchType, setResearchType] = useState("ingredient_research");
-  const [researching, setResearching] = useState(false);
-  const [expandedSession, setExpandedSession] = useState<string | null>(null);
 
   const currentIdx = STAGES.indexOf(product.stage as typeof STAGES[number]);
   const isEditable = user.role !== "viewer";
@@ -107,9 +103,7 @@ export default function ProductDetailClient({
     if (activeTab === "documents") {
       fetch(`/api/products/${product.id}/documents`).then(r => r.ok ? r.json() : []).then(d => { if (Array.isArray(d)) setDocs(d); });
     }
-    if (activeTab === "research") {
-      fetch(`/api/products/${product.id}/ai-research`).then(r => r.ok ? r.json() : []).then(d => { if (Array.isArray(d)) setSessions(d); });
-    }
+    // research tab is now a prompt generator — no API fetch needed
   }, [activeTab, product.id]);
 
   const save = async (extra?: Record<string, unknown>) => {
@@ -136,17 +130,6 @@ export default function ProductDetailClient({
     }
     setUploading(false);
     e.target.value = "";
-  };
-
-  const runResearch = async () => {
-    setResearching(true);
-    const res = await fetch(`/api/products/${product.id}/ai-research`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ researchType }) });
-    if (res.ok) {
-      const session = await res.json();
-      setSessions(prev => [session, ...prev]);
-      setExpandedSession(session.id);
-    }
-    setResearching(false);
   };
 
   const extractionBadge = (status: string) => {
@@ -215,7 +198,7 @@ export default function ProductDetailClient({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={tab.icon} /></svg>
               {tab.label}
               {tab.key === "documents" && docs.length > 0 && <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{docs.length}</span>}
-              {tab.key === "research" && sessions.length > 0 && <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">{sessions.length}</span>}
+              {tab.key === "research" && <span className="text-xs bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded-full">9</span>}
             </button>
           ))}
         </div>
@@ -332,56 +315,78 @@ export default function ProductDetailClient({
           </div>
         )}
 
-        {/* ══════════ AI RESEARCH TAB ══════════ */}
-        {activeTab === "research" && (
+        {/* ══════════ RESEARCH PROMPTS TAB ══════════ */}
+        {activeTab === "research" && (() => {
+          const selectedPrompt = DEFAULT_RESEARCH_PROMPTS.find(p => p.key === researchType) || DEFAULT_RESEARCH_PROMPTS[0];
+          const generatedPrompt = fillPromptTemplate(selectedPrompt.template, {
+            productName: product.name, name: product.name, brandName: product.brandName,
+            productConcept: product.productConcept, dosageForm: product.dosageForm,
+            routeOfAdmin: product.routeOfAdmin, stage: product.stage, targetMarket: product.targetMarket,
+          });
+          const copyPrompt = () => { navigator.clipboard.writeText(generatedPrompt); };
+          const downloadPrompt = () => {
+            const blob = new Blob([generatedPrompt], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${product.name.replace(/\s+/g, "_")}_${researchType}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+          };
+          return (
           <div className="space-y-6">
-            {/* Research launcher */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">Run AI Research</h3>
-              <p className="text-sm text-gray-500 mb-4">Select a research type. AI will analyze your product concept, uploaded documents, and knowledge base.</p>
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {RESEARCH_TYPES.map(rt => (
-                  <button key={rt.value} onClick={() => setResearchType(rt.value)}
-                    className={`text-left p-3 rounded-lg border-2 transition-all ${researchType === rt.value ? "border-purple-500 bg-purple-50" : "border-gray-200 hover:border-gray-300"}`}>
-                    <p className="text-sm font-medium text-gray-900">{rt.label}</p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold text-gray-900">Research Prompt Generator</h3>
+                  <p className="text-sm text-gray-500 mt-1">Select a research type, copy the prompt, paste into your AI tool (ChatGPT, Claude, Perplexity), then upload results back in the Documents tab.</p>
+                </div>
+              </div>
+
+              {/* Research type selector */}
+              <div className="grid grid-cols-3 gap-3 mb-6">
+                {DEFAULT_RESEARCH_PROMPTS.map(rt => (
+                  <button key={rt.key} onClick={() => setResearchType(rt.key)}
+                    className={`text-left p-3 rounded-lg border-2 transition-all ${researchType === rt.key ? "border-purple-500 bg-purple-50" : "border-gray-200 hover:border-gray-300"}`}>
+                    <p className="text-sm font-medium text-gray-900"><span className="mr-1.5">{rt.icon}</span>{rt.label}</p>
                     <p className="text-xs text-gray-500 mt-0.5">{rt.desc}</p>
                   </button>
                 ))}
               </div>
-              <button onClick={runResearch} disabled={researching} className="px-6 py-2.5 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-                {researching ? "Researching..." : "Run AI Research"}
-              </button>
+
+              {/* Generated prompt */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between bg-gray-50 px-4 py-2 border-b border-gray-200">
+                  <span className="text-sm font-medium text-gray-700">{selectedPrompt.icon} {selectedPrompt.label} — Ready to Copy</span>
+                  <div className="flex gap-2">
+                    <button onClick={copyPrompt} className="px-3 py-1.5 text-xs bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                      Copy Prompt
+                    </button>
+                    <button onClick={downloadPrompt} className="px-3 py-1.5 text-xs bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      Download .txt
+                    </button>
+                  </div>
+                </div>
+                <pre className="p-4 text-xs text-gray-700 bg-white max-h-96 overflow-y-auto whitespace-pre-wrap font-mono leading-relaxed">{generatedPrompt}</pre>
+              </div>
             </div>
 
-            {/* Past sessions */}
-            {sessions.length > 0 && (
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-3">Past Research Sessions</h3>
-                <div className="space-y-2">
-                  {sessions.map(s => (
-                    <div key={s.id} className="bg-white rounded-lg border border-gray-200">
-                      <button onClick={() => setExpandedSession(expandedSession === s.id ? null : s.id)}
-                        className="w-full text-left p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">{s.researchType.replace(/_/g, " ")}</span>
-                          <span className="text-xs text-gray-500">Stage: {formatStage(s.stage)}</span>
-                          <span className="text-xs text-gray-400">{new Date(s.createdAt).toLocaleDateString()}</span>
-                        </div>
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${s.status === "completed" ? "bg-green-100 text-green-700" : s.status === "failed" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>{s.status}</span>
-                      </button>
-                      {expandedSession === s.id && s.responseJson && (
-                        <div className="px-4 pb-4 border-t border-gray-100">
-                          <pre className="mt-3 text-xs bg-gray-50 p-4 rounded-lg overflow-x-auto text-gray-700 max-h-96 overflow-y-auto whitespace-pre-wrap">{(() => { try { return JSON.stringify(JSON.parse(s.responseJson), null, 2); } catch { return s.responseJson; } })()}</pre>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Workflow instructions */}
+            <div className="bg-purple-50 rounded-xl border border-purple-200 p-6">
+              <h4 className="font-semibold text-purple-900 mb-3">How to use this prompt</h4>
+              <ol className="text-sm text-purple-800 space-y-2 list-decimal list-inside">
+                <li><strong>Copy</strong> the prompt above (or download as .txt)</li>
+                <li><strong>Paste</strong> into your AI tool — ChatGPT, Claude, Perplexity, or any LLM</li>
+                <li><strong>Get the research output</strong> — the prompt asks for structured JSON so results are consistent</li>
+                <li><strong>Save the output</strong> as a PDF or text file</li>
+                <li><strong>Upload</strong> it back here in the <button onClick={() => setActiveTab("documents")} className="text-purple-700 underline font-medium">Documents tab</button> — select the matching document type</li>
+              </ol>
+            </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* ══════════ REVIEW & NOTES TAB ══════════ */}
         {activeTab === "review" && (
