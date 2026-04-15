@@ -2,6 +2,85 @@ import { prisma } from "../db/prisma";
 
 const BASE = "https://health-products.canada.ca/api/natural-licences";
 
+/**
+ * Auto-populate Ingredient KB from a licence's ingredients after sync.
+ * Dedupes by nhpidId (if present) or normalized name. Tags source as "lnhpd".
+ */
+async function autoPopulateKB(
+  medicinal: unknown[],
+  nonMedicinal: unknown[]
+): Promise<{ created: number; skipped: number }> {
+  let created = 0;
+  let skipped = 0;
+
+  const allExisting = await prisma.ingredient.findMany({
+    select: { nhpidId: true, properNameEn: true, commonNameEn: true, nhpidName: true },
+  });
+  const existingNhpidIds = new Set(allExisting.map(i => i.nhpidId).filter(Boolean));
+  const existingNames = new Set(
+    allExisting.flatMap(i => [i.properNameEn, i.commonNameEn, i.nhpidName])
+      .filter(Boolean)
+      .map(n => n!.toLowerCase().trim())
+  );
+
+  const isDuplicate = (name: string, nhpidId: string | null) => {
+    if (nhpidId && existingNhpidIds.has(nhpidId)) return true;
+    if (existingNames.has(name.toLowerCase().trim())) return true;
+    return false;
+  };
+
+  // Medicinal ingredients
+  for (const mi of medicinal) {
+    const m = mi as Record<string, unknown>;
+    const name = String(m.ingredient_name || m.name || "").trim();
+    if (!name) continue;
+    const nhpidId = String(m.ingredient_id || "").trim() || null;
+    if (isDuplicate(name, nhpidId)) { skipped++; continue; }
+
+    try {
+      await prisma.ingredient.create({
+        data: {
+          nhpidId,
+          nhpidName: name,
+          ingredientType: "medicinal",
+          properNameEn: name,
+          commonNameEn: String(m.ingredient_text || m.common_name || "") || "",
+          scientificName: String(m.scientific_name || "") || "",
+          category: String(m.category || "") || "",
+          importedFrom: "lnhpd",
+        },
+      });
+      existingNames.add(name.toLowerCase().trim());
+      if (nhpidId) existingNhpidIds.add(nhpidId);
+      created++;
+    } catch { skipped++; }
+  }
+
+  // Non-medicinal ingredients
+  for (const ni of nonMedicinal) {
+    const n = ni as Record<string, unknown>;
+    const name = String(n.ingredient_name || n.name || "").trim();
+    if (!name) continue;
+    if (isDuplicate(name, null)) { skipped++; continue; }
+
+    try {
+      await prisma.ingredient.create({
+        data: {
+          nhpidName: name,
+          ingredientType: "non_medicinal",
+          properNameEn: name,
+          commonNameEn: name,
+          importedFrom: "lnhpd",
+        },
+      });
+      existingNames.add(name.toLowerCase().trim());
+      created++;
+    } catch { skipped++; }
+  }
+
+  return { created, skipped };
+}
+
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url, { next: { revalidate: 0 } });
   if (!res.ok) {
@@ -112,6 +191,10 @@ export async function syncLNHPD(): Promise<{
 
       synced++;
       details.push(`Synced: NPN ${lic.licenceNumber} — ${lic.productName} (lnhpd:${lnhpdId})`);
+
+      // Auto-populate Ingredient KB
+      const kb = await autoPopulateKB(ingredients, nonMed);
+      if (kb.created > 0) details.push(`  → KB +${kb.created} ingredient${kb.created === 1 ? "" : "s"}`);
 
       // Rate limit: 300ms between products
       await new Promise(r => setTimeout(r, 300));
@@ -236,9 +319,13 @@ export async function syncSingleLicence(licenceId: string): Promise<{
       },
     });
 
+    // Auto-populate Ingredient KB
+    const kb = await autoPopulateKB(ingredients, nonMed);
+    const kbNote = kb.created > 0 ? `, KB +${kb.created}` : "";
+
     return {
       success: true,
-      message: `Synced NPN ${lic.licenceNumber} — ${ingredients.length} ings, ${nonMed.length} non-med, ${purposes.length} claims, ${risks.length} risks, ${doses.length} doses`,
+      message: `Synced NPN ${lic.licenceNumber} — ${ingredients.length} ings, ${nonMed.length} non-med, ${purposes.length} claims, ${risks.length} risks, ${doses.length} doses${kbNote}`,
       data: updated as unknown as Record<string, unknown>,
     };
   } catch (e) {
