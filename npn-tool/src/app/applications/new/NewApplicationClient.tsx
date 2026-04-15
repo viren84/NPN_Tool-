@@ -63,7 +63,7 @@ export default function NewApplicationClient({
       <Sidebar user={user} />
       <GlobalSearch />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 p-6 min-w-0">
         <div className="max-w-3xl">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-gray-900">New PLA Application</h2>

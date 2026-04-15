@@ -74,6 +74,7 @@ export const DOCUMENT_FIELDS = [
 
 export const PRODUCT_FIELDS = [
   "name", "brandName", "stage", "priority", "assignedTo", "companyId",
+  "targetCondition", "targetConditionDetail",
   "dosageForm", "routeOfAdmin", "productConcept", "targetMarket",
   "applicationClass", "submissionType",
   "npnNumber", "applicationId", "licenceId", "trackingNumber",
@@ -83,6 +84,35 @@ export const PRODUCT_FIELDS = [
   "ingredientCount", "claimCount", "documentCount",
   "handoffReady", "handoffDate", "handoffNotes",
   "notes", "tags",
+];
+
+export const PRODUCT_DOCUMENT_FIELDS = [
+  "title", "docType", "stage", "notes",
+];
+
+export const COMPETITOR_PRODUCT_FIELDS = [
+  "sourceUrl", "sourceType", "competitorName", "productName", "brand",
+  "companyWebsite", "price", "dosageForm", "servingSize", "servingsPerContainer",
+  "marketingStrategy", "socialPresence", "nhpComplianceNotes", "notes",
+];
+
+export const PRODUCT_INGREDIENT_SPEC_FIELDS = [
+  "ingredientName", "properName", "commonName", "scientificName",
+  "ingredientType", "supplierName", "supplierCountry", "coaDocumentId",
+  "targetDose", "targetUnit", "doseRangeMin", "doseRangeMax",
+  "standardization", "extractRatio", "sourceOrganism", "partUsed",
+  "monographName", "monographCompliant", "status", "notes", "sortOrder",
+];
+
+export const CONDITION_STACK_FIELDS = [
+  "condition", "conditionDetail", "stackName", "stackType",
+  "primaryMolecule", "primaryDose", "primaryUnit",
+  "applicationClass", "monographCoverage", "complianceNotes",
+  "selected", "notes",
+];
+
+export const STAGE_DATA_FIELDS = [
+  "stage", "sectionKey", "dataJson", "notes", "manualOverride",
 ];
 
 export const VAULT_FIELDS = [

@@ -70,7 +70,7 @@ export default function DashboardClient({ user, applications, recentLogs, stats,
       <Sidebar user={user} />
       <GlobalSearch />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 p-6 min-w-0">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>

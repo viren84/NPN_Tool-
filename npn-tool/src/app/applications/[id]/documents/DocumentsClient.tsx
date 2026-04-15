@@ -141,7 +141,7 @@ export default function DocumentsClient({
       <GlobalSearch />
       <input ref={importRef} type="file" accept=".html,.htm,.txt" className="hidden" onChange={handleImport} />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 p-6 min-w-0">
         <WizardStepper activeStep={5} completedSteps={[0, 1, 2, 3, 4]} />
         <div className="flex items-center justify-between mb-6">
           <div>

@@ -90,7 +90,7 @@ export default function IngredientsPage() {
       <GlobalSearch />
       <HelpPanel stepName="Ingredient Knowledge Base" stepDescription="Central database of all ingredients with regulatory data, safety info, monograph links, and supplier records." />
 
-      <main className="flex-1 ml-64 p-6">
+      <main className="flex-1 p-6 min-w-0">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Ingredient Knowledge Base</h2>

@@ -269,7 +269,7 @@ export default function ProductPipelineClient({ user, initialProducts }: Props) 
       <Sidebar user={user as never} />
       <GlobalSearch />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 p-6 min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>

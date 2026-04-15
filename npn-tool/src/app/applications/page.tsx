@@ -63,7 +63,7 @@ export default function ApplicationsPage() {
       <div className="flex min-h-screen bg-gray-50">
         {user && <Sidebar user={user as never} />}
         <GlobalSearch />
-        <main className="flex-1 ml-64 p-8 flex items-center justify-center">
+        <main className="flex-1 p-6 min-w-0 flex items-center justify-center">
           <div className="w-6 h-6 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
         </main>
       </div>
@@ -75,7 +75,7 @@ export default function ApplicationsPage() {
       <Sidebar user={user as never} />
       <GlobalSearch />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 p-6 min-w-0">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-gray-900">Applications</h2>
           <Link

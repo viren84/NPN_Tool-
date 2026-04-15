@@ -304,7 +304,7 @@ export default function IngredientSubmissionDetailPage() {
       <Sidebar user={user} />
       <GlobalSearch />
 
-      <main className="flex-1 ml-64 p-6">
+      <main className="flex-1 p-6 min-w-0">
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>

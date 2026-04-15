@@ -254,7 +254,7 @@ export default function ApplicationEditor({
       <GlobalSearch />
       <HelpPanel stepName={TABS.find(t => t.key === activeTab)?.label} />
 
-      <main className="flex-1 ml-64 p-6">
+      <main className="flex-1 p-6 min-w-0">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div>
