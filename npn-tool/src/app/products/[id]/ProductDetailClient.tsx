@@ -34,18 +34,6 @@ const DOC_TYPES = [
   { value: "marketing_material", label: "Marketing Material" },
   { value: "other", label: "Other Document" },
 ];
-const RESEARCH_TYPES = [
-  { value: "ingredient_research", label: "Ingredient Research", desc: "Find best ingredients for this concept" },
-  { value: "competitor_analysis", label: "Competitor Analysis", desc: "Analyze competing products in the market" },
-  { value: "market_analysis", label: "Market Analysis", desc: "Identify market gaps and opportunities" },
-  { value: "regulatory_gap", label: "Regulatory Gap Analysis", desc: "What's missing for Health Canada submission" },
-  { value: "monograph_compliance", label: "Monograph Compliance", desc: "Check against NHPID monographs" },
-  { value: "formulation_suggestion", label: "Formulation Suggestion", desc: "AI-recommended formulation" },
-  { value: "dosage_recommendation", label: "Dosage Recommendation", desc: "Optimal dose ranges by population" },
-  { value: "condition_research", label: "Condition Research", desc: "Deep dive on target health condition" },
-  { value: "combination_discovery", label: "Combination Discovery", desc: "Find synergistic ingredient combos" },
-];
-
 const TABS = [
   { key: "overview", label: "Overview", icon: "M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z M14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6z" },
   { key: "documents", label: "Documents", icon: "M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" },
@@ -257,7 +245,7 @@ export default function ProductDetailClient({
                 <h3 className="font-semibold text-gray-900 mb-4">Quick Stats</h3>
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div className="p-3 bg-gray-50 rounded-lg"><p className="text-2xl font-bold text-gray-900">{docs.length}</p><p className="text-xs text-gray-500">Documents</p></div>
-                  <div className="p-3 bg-gray-50 rounded-lg"><p className="text-2xl font-bold text-gray-900">{sessions.length}</p><p className="text-xs text-gray-500">AI Sessions</p></div>
+                  <div className="p-3 bg-gray-50 rounded-lg"><p className="text-2xl font-bold text-gray-900">9</p><p className="text-xs text-gray-500">Prompt Types</p></div>
                   <div className="p-3 bg-gray-50 rounded-lg"><p className="text-2xl font-bold text-gray-900">{formatStage(product.stage).split(" ")[0]}</p><p className="text-xs text-gray-500">Stage</p></div>
                 </div>
               </div>
