@@ -687,6 +687,11 @@ model Application {
   sterile           Boolean  @default(false)
   durationOfUse     String   @default("")
   version           Int      @default(1)
+  // Data source tracking: {"productName":"imported","ingredients[0].name":"ai_researched",...}
+  dataSourcesJson   String   @default("{}")
+  // Source document reference (if created from upload)
+  sourceDocumentName String  @default("")
+  sourceDocumentPath String  @default("")
   createdById       String
   createdBy         User     @relation(fields: [createdById], references: [id])
   createdAt         DateTime @default(now())
