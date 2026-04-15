@@ -5,61 +5,12 @@
   --foreground: #171717;
   color-scheme: light;
 }
+html { color-scheme: light; }
 
 body {
-  background: #f9fafb !important;
-  color: #171717 !important;
+  background: #f9fafb;
+  color: #171717;
   font-family: Arial, Helvetica, sans-serif;
-}
-
-/* Force light mode everywhere — survives Dark Reader */
-html {
-  color-scheme: light !important;
-  background: #f9fafb !important;
-}
-
-/* Force white backgrounds on all key elements */
-html, body, main, aside, nav,
-div[class*="bg-white"],
-div[class*="bg-gray-50"],
-table, thead, tbody, tr, td, th,
-input, select, textarea, button,
-[class*="rounded-xl"],
-[class*="rounded-lg"] {
-  color-scheme: light !important;
-}
-
-/* Detail panel — always white */
-div[class*="fixed top-0 right-0"] {
-  background-color: #ffffff !important;
-  color: #171717 !important;
-}
-
-/* Modal — always white */
-div[class*="bg-white"][class*="rounded-2xl"] {
-  background-color: #ffffff !important;
-  color: #171717 !important;
-}
-
-/* Table rows — always light */
-tbody tr {
-  background-color: #ffffff !important;
-}
-tbody tr:hover {
-  background-color: #f9fafb !important;
-}
-
-/* Sidebar — always white */
-aside {
-  background-color: #ffffff !important;
-  color: #171717 !important;
-}
-
-/* Inputs — always white */
-input, select, textarea {
-  background-color: #ffffff !important;
-  color: #171717 !important;
-  border-color: #d1d5db !important;
 }
 
 /* Responsive sidebar */
@@ -75,7 +26,103 @@ input, select, textarea {
 ::-webkit-scrollbar-track { background: #f1f1f1; }
 ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
 
-/* Hide Next.js dev error overlay — Dark Reader causes hydration mismatch */
+/* Hide Next.js dev error overlay */
 nextjs-portal { display: none !important; }
 [data-nextjs-dialog-overlay] { display: none !important; }
 [data-nextjs-dialog] { display: none !important; }
+
+/* ============================================================
+   DARK MODE — activated by .dark class on <html>
+   ============================================================ */
+
+html.dark {
+  color-scheme: dark;
+  background: #111827;
+}
+html.dark body {
+  background: #111827 !important;
+  color: #f9fafb !important;
+}
+html.dark main {
+  background-color: #111827 !important;
+}
+
+/* Cards / panels */
+html.dark .bg-white { background-color: #1f2937 !important; }
+html.dark .bg-gray-50 { background-color: #111827 !important; }
+html.dark .bg-gray-100 { background-color: #374151 !important; }
+html.dark .bg-gray-200 { background-color: #374151 !important; }
+
+/* Text */
+html.dark .text-gray-900 { color: #f9fafb !important; }
+html.dark .text-gray-800 { color: #f3f4f6 !important; }
+html.dark .text-gray-700 { color: #e5e7eb !important; }
+html.dark .text-gray-600 { color: #d1d5db !important; }
+html.dark .text-gray-500 { color: #9ca3af !important; }
+html.dark .text-gray-400 { color: #6b7280 !important; }
+
+/* Borders */
+html.dark .border-gray-200 { border-color: #374151 !important; }
+html.dark .border-gray-100 { border-color: #1f2937 !important; }
+html.dark .border-gray-300 { border-color: #4b5563 !important; }
+
+/* Divide lines */
+html.dark .divide-gray-50 > * + * { border-color: #1f2937 !important; }
+html.dark .divide-gray-100 > * + * { border-color: #374151 !important; }
+html.dark .divide-y > * + * { border-color: #374151 !important; }
+
+/* Hover states */
+html.dark .hover\:bg-gray-50:hover { background-color: #374151 !important; }
+html.dark .hover\:bg-gray-100:hover { background-color: #374151 !important; }
+html.dark .hover\:bg-gray-400:hover { background-color: #6b7280 !important; }
+html.dark .hover\:text-gray-900:hover { color: #f9fafb !important; }
+
+/* Wizard stepper — ensure circles visible in dark mode */
+html.dark .bg-gray-300 { background-color: #4b5563 !important; }
+
+/* Red accents — sidebar active, buttons */
+html.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.15) !important; }
+html.dark .text-red-700 { color: #fca5a5 !important; }
+html.dark .hover\:text-red-600:hover { color: #f87171 !important; }
+html.dark .hover\:bg-red-50:hover { background-color: rgba(239, 68, 68, 0.15) !important; }
+
+/* Sidebar */
+html.dark aside {
+  background-color: #1f2937 !important;
+  border-color: #374151 !important;
+  color: #f9fafb !important;
+}
+
+/* Table */
+html.dark tbody tr { background-color: #1f2937 !important; }
+html.dark tbody tr:hover { background-color: #374151 !important; }
+html.dark thead tr { background-color: #0f172a !important; }
+html.dark th { color: #9ca3af !important; }
+
+/* Inputs */
+html.dark input, html.dark select, html.dark textarea {
+  background-color: #374151 !important;
+  color: #f9fafb !important;
+  border-color: #4b5563 !important;
+}
+html.dark input::placeholder, html.dark textarea::placeholder {
+  color: #6b7280 !important;
+}
+
+/* Detail/slide-over panel */
+html.dark div[class*="fixed"][class*="right-0"] {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+}
+
+/* Modals */
+html.dark .rounded-xl.bg-white,
+html.dark .rounded-2xl.bg-white,
+html.dark .shadow-2xl.bg-white {
+  background-color: #1f2937 !important;
+  color: #f9fafb !important;
+}
+
+/* Scrollbar in dark mode */
+html.dark ::-webkit-scrollbar-track { background: #1f2937; }
+html.dark ::-webkit-scrollbar-thumb { background: #4b5563; }

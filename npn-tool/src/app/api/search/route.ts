@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const user = await requireAuth();
   if (isErrorResponse(user)) return user;
 
-  const q = req.nextUrl.searchParams.get("q") || "";
+  const q = (req.nextUrl.searchParams.get("q") || "").replace(/[<>]/g, "");
   if (q.length < 2) return NextResponse.json({ results: [] });
 
   const [licences, applications, ingredients, submissions] = await Promise.all([

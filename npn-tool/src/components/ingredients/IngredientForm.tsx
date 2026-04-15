@@ -1,6 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
+
+interface KbIngredient {
+  id: string;
+  nhpidName: string;
+  properNameEn: string;
+  commonNameEn: string;
+  scientificName: string;
+  casNumber: string;
+}
 
 const UNITS = ["mg", "mcg", "g", "mL", "IU", "%", "CFU", "billion CFU"];
 const PURPOSES = ["root", "leaf", "seed", "fruit", "bark", "whole plant", "flower", "rhizome", "aerial parts"];
@@ -40,6 +49,51 @@ export default function IngredientForm({ appId, ingredientId, ingredient, onClos
     supplierName: (ingredient?.supplierName as string) || "",
   });
   const [saving, setSaving] = useState(false);
+  const [mode, setMode] = useState<"manual" | "auto">("manual");
+  const [kbQuery, setKbQuery] = useState("");
+  const [kbResults, setKbResults] = useState<KbIngredient[]>([]);
+  const [kbLoading, setKbLoading] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedKb, setSelectedKb] = useState<KbIngredient | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const searchKb = (q: string) => {
+    setKbQuery(q);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (q.length < 2) { setKbResults([]); setShowDropdown(false); return; }
+    timerRef.current = setTimeout(async () => {
+      setKbLoading(true);
+      const res = await fetch(`/api/ingredients?q=${encodeURIComponent(q)}&limit=10`).catch(() => null);
+      if (res?.ok) {
+        const data = await res.json();
+        setKbResults(data.ingredients || []);
+        setShowDropdown(true);
+      }
+      setKbLoading(false);
+    }, 250);
+  };
+
+  const pickKb = (ing: KbIngredient) => {
+    setSelectedKb(ing);
+    setShowDropdown(false);
+    setKbQuery("");
+    setForm(prev => ({
+      ...prev,
+      properName: ing.properNameEn || prev.properName,
+      commonName: ing.commonNameEn || prev.commonName,
+      scientificName: ing.scientificName || prev.scientificName,
+      casNumber: ing.casNumber || prev.casNumber,
+    }));
+  };
+
+  const clearKb = () => {
+    setSelectedKb(null);
+    setKbQuery("");
+    setKbResults([]);
+    setShowDropdown(false);
+    setTimeout(() => searchRef.current?.focus(), 50);
+  };
 
   const save = async () => {
     if (!form.properName.trim()) return;
@@ -66,6 +120,85 @@ export default function IngredientForm({ appId, ingredientId, ingredient, onClos
           <h3 className="text-lg font-bold text-gray-900">{ingredientId ? "Edit" : "Add"} Medicinal Ingredient</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
         </div>
+
+        {/* Mode Toggle */}
+        <div className="flex items-center gap-2 mb-4 p-1 bg-gray-100 rounded-lg w-fit">
+          <button
+            onClick={() => setMode("manual")}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === "manual" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            Manual
+          </button>
+          <button
+            onClick={() => setMode("auto")}
+            className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === "auto" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
+          >
+            Auto (Search NHPD KB)
+          </button>
+        </div>
+
+        {/* KB Search Panel (Auto mode) */}
+        {mode === "auto" && (
+          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs font-medium text-blue-700 mb-2">Search the NHPD Ingredient Knowledge Base — select a result to auto-fill the form fields below.</p>
+            {selectedKb ? (
+              <div className="flex items-center justify-between bg-white border border-blue-300 rounded-lg px-3 py-2">
+                <div>
+                  <span className="text-sm font-medium text-gray-900">{selectedKb.nhpidName || selectedKb.properNameEn}</span>
+                  {selectedKb.scientificName && (
+                    <span className="text-xs text-gray-500 ml-2">— {selectedKb.scientificName}</span>
+                  )}
+                </div>
+                <button
+                  onClick={clearKb}
+                  className="text-xs text-blue-600 hover:text-blue-800 font-medium ml-4 whitespace-nowrap"
+                >
+                  Clear / Re-search
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={kbQuery}
+                  onChange={e => searchKb(e.target.value)}
+                  onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+                  placeholder="Type proper name, common name, or scientific name..."
+                  className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  autoFocus
+                />
+                {kbLoading && (
+                  <div className="absolute right-3 top-2.5">
+                    <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+                  </div>
+                )}
+                {showDropdown && kbResults.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                    {kbResults.map(ing => (
+                      <button
+                        key={ing.id}
+                        onMouseDown={() => pickKb(ing)}
+                        className="w-full text-left px-4 py-2.5 hover:bg-blue-50 border-b border-gray-50 last:border-0"
+                      >
+                        <div className="text-sm font-medium text-gray-900">{ing.nhpidName || ing.properNameEn}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {[ing.properNameEn, ing.scientificName].filter(Boolean).join(" · ")}
+                          {ing.casNumber && <span className="ml-2 text-gray-400">CAS {ing.casNumber}</span>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {showDropdown && kbResults.length === 0 && !kbLoading && kbQuery.length >= 2 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-3 text-sm text-gray-500">
+                    No results found in the NHPD Knowledge Base.
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="space-y-5">
           {/* Names */}

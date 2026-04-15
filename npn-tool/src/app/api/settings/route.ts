@@ -22,7 +22,7 @@ export async function GET() {
 export async function PUT(req: NextRequest) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (user.role !== "admin") return NextResponse.json({ error: "Admin only" }, { status: 403 });
+  if (user.role === "viewer") return NextResponse.json({ error: "Viewers cannot modify settings" }, { status: 403 });
 
   const data = await req.json();
 

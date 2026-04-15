@@ -36,6 +36,7 @@
     "bcryptjs": "^3.0.3",
     "handlebars": "^4.7.9",
     "next": "16.2.3",
+    "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
     "prisma": "^7.7.0",
     "react": "19.2.4",

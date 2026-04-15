@@ -91,7 +91,7 @@ export default function CompanyProfileClient({
       <Sidebar user={user} />
       <GlobalSearch />
 
-      <main className="flex-1 ml-64 p-6">
+      <main className="flex-1 p-6 min-w-0">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-bold text-gray-900">Company Profile</h2>
           {isEditable && tab === "company" && (

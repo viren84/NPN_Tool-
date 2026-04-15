@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const user = await requireAuth();
   if (isErrorResponse(user)) return user;
 
-  const format = req.nextUrl.searchParams.get("format") || "json";
+  const format = req.nextUrl.searchParams.get("format") || "csv";
   const status = req.nextUrl.searchParams.get("status") || "";
   const purpose = req.nextUrl.searchParams.get("purpose") || "api_access";
   const agent = req.nextUrl.searchParams.get("agent") || "";

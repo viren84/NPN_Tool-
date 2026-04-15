@@ -7,7 +7,7 @@ export default async function DashboardPage() {
   const user = await getSession();
   if (!user) redirect("/login");
 
-  const [applications, recentLogs, activeLicences, ingredientCount, submissionCount] = await Promise.all([
+  const [applications, recentLogs, activeLicences, ingredientCount, submissionCount, allProducts] = await Promise.all([
     prisma.application.findMany({
       orderBy: { updatedAt: "desc" },
       take: 10,
@@ -21,6 +21,11 @@ export default async function DashboardPage() {
     prisma.productLicence.count({ where: { productStatus: "active" } }),
     prisma.ingredient.count(),
     prisma.ingredientSubmission.count(),
+    prisma.product.findMany({
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: { id: true, name: true, stage: true, priority: true, updatedAt: true },
+    }),
   ]);
 
   // Filter out repetitive/noisy log entries for cleaner activity feed
@@ -36,6 +41,7 @@ export default async function DashboardPage() {
     activeLicences,
     ingredientCount,
     submissionCount,
+    pipelineProducts: allProducts.length,
   };
 
   return (
@@ -44,6 +50,7 @@ export default async function DashboardPage() {
       applications={applications as never}
       recentLogs={cleanLogs as never}
       stats={stats}
+      pipelineProducts={JSON.parse(JSON.stringify(allProducts))}
     />
   );
 }

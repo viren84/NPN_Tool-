@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import GlobalSearch from "@/components/GlobalSearch";
+import WizardStepper from "@/components/WizardStepper";
+import { DOC_LABELS } from "@/lib/constants/doc-labels";
 
 interface Document {
   id: string;
@@ -11,22 +13,6 @@ interface Document {
   status: string;
   content: string;
 }
-
-const DOC_LABELS: Record<string, string> = {
-  pla_form: "PLA Form (.html)",
-  cover_letter: "Cover Letter",
-  fps_form: "Finished Product Specifications",
-  label_en: "Product Label (English)",
-  label_fr: "Product Label (French)",
-  monograph_attestation: "Monograph Attestation",
-  safety_report: "Safety Summary Report",
-  efficacy_report: "Efficacy Summary Report",
-  animal_tissue_form: "Animal Tissue Form",
-  senior_attestation: "Senior Official Attestation",
-  ingredient_specs: "Medicinal Ingredient Specifications",
-  non_med_list: "Non-Medicinal Ingredient List",
-  quality_chemistry_report: "Quality/Chemistry Report",
-};
 
 const statusStyles: Record<string, string> = {
   pending: "bg-gray-100 text-gray-600",
@@ -55,6 +41,15 @@ export default function DocumentsClient({
   const [activeDoc, setActiveDoc] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [generating, setGenerating] = useState<string | null>(null);
+  const importRef = useRef<HTMLInputElement>(null);
+
+  // Bug fix: re-sync editContent when docs change (after save/regenerate/approve)
+  useEffect(() => {
+    if (activeDoc) {
+      const current = docs.find((d) => d.id === activeDoc);
+      if (current) setEditContent(current.content);
+    }
+  }, [docs, activeDoc]);
 
   const generateDoc = async (documentType: string) => {
     setGenerating(documentType);
@@ -65,7 +60,6 @@ export default function DocumentsClient({
     });
 
     if (res.ok) {
-      // Refresh docs
       const appRes = await fetch(`/api/applications/${application.id}`);
       if (appRes.ok) {
         const updated = await appRes.json();
@@ -106,6 +100,38 @@ export default function DocumentsClient({
     setDocs(docs.map((d) => (d.id === docId ? { ...d, status: "approved" } : d)));
   };
 
+  const handleDiscard = () => {
+    const current = docs.find((d) => d.id === activeDoc);
+    if (current) setEditContent(current.content);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setEditContent(reader.result as string);
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const handleExportAllPdf = async () => {
+    const res = await fetch(`/api/applications/${application.id}/export-pdf`);
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] || "PLA_Package.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const activeDocObj = docs.find((d) => d.id === activeDoc);
   const allApproved = docs.every((d) => d.status === "approved");
   const allGenerated = docs.every((d) => d.status !== "pending");
 
@@ -113,8 +139,10 @@ export default function DocumentsClient({
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar user={user} />
       <GlobalSearch />
+      <input ref={importRef} type="file" accept=".html,.htm,.txt" className="hidden" onChange={handleImport} />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 p-6 min-w-0">
+        <WizardStepper activeStep={5} completedSteps={[0, 1, 2, 3, 4]} />
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">{application.productName}</h2>
@@ -123,6 +151,17 @@ export default function DocumentsClient({
             </p>
           </div>
           <div className="flex gap-3">
+            {docs.some((d) => d.content) && (
+              <button
+                onClick={handleExportAllPdf}
+                className="px-4 py-2.5 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export All Documents
+              </button>
+            )}
             {!allGenerated && (
               <button
                 onClick={generateAll}
@@ -163,9 +202,23 @@ export default function DocumentsClient({
                   <span className={`text-sm font-medium ${activeDoc === doc.id ? "text-blue-900" : "text-gray-900"}`}>
                     {DOC_LABELS[doc.documentType] || doc.documentType}
                   </span>
-                  <span className={`px-2 py-0.5 text-xs rounded-full shrink-0 ${statusStyles[doc.status] || ""}`}>
-                    {generating === doc.documentType ? "generating..." : doc.status}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {doc.content && (
+                      <a
+                        href={`/api/applications/${application.id}/export-pdf?docType=${doc.documentType}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors"
+                        title="Download as PDF"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </a>
+                    )}
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${statusStyles[doc.status] || ""}`}>
+                      {generating === doc.documentType ? "generating..." : doc.status}
+                    </span>
+                  </div>
                 </div>
               </button>
             ))}
@@ -173,21 +226,33 @@ export default function DocumentsClient({
 
           {/* Document Preview/Edit */}
           <div className="flex-1 bg-white rounded-xl border border-gray-200 min-h-[600px] max-h-[80vh] flex flex-col">
-            {activeDoc ? (
+            {activeDoc && activeDocObj ? (
               <div className="flex flex-col h-full">
                 <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 shrink-0">
                   <span className="text-sm font-semibold text-gray-900">
-                    {DOC_LABELS[docs.find((d) => d.id === activeDoc)?.documentType || ""] || "Document"}
+                    {DOC_LABELS[activeDocObj.documentType] || "Document"}
                   </span>
-                  <div className="flex gap-2">
-                    <button onClick={saveDoc} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium">
-                      Save Edits
+                  <div className="flex gap-2 flex-wrap justify-end">
+                    <button onClick={handleDiscard} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-500 rounded-lg hover:bg-gray-200 font-medium" title="Discard unsaved changes">
+                      Discard
                     </button>
+                    <button onClick={() => importRef.current?.click()} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium" title="Import HTML file to replace content">
+                      Import
+                    </button>
+                    <button onClick={saveDoc} className="px-3 py-1.5 text-xs bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium">
+                      Save
+                    </button>
+                    <a
+                      href={`/api/applications/${application.id}/export-pdf?docType=${activeDocObj.documentType}`}
+                      className="px-3 py-1.5 text-xs bg-gray-800 text-white rounded-lg hover:bg-gray-900 font-medium inline-flex items-center gap-1"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3" />
+                      </svg>
+                      PDF
+                    </a>
                     <button
-                      onClick={() => {
-                        const doc = docs.find((d) => d.id === activeDoc);
-                        if (doc) generateDoc(doc.documentType);
-                      }}
+                      onClick={() => generateDoc(activeDocObj.documentType)}
                       className="px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 font-medium"
                     >
                       Regenerate

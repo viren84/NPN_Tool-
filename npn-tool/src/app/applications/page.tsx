@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
-import { getSession } from "@/lib/auth/session";
-import { prisma } from "@/lib/db/prisma";
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
 import GlobalSearch from "@/components/GlobalSearch";
@@ -16,25 +16,66 @@ const statusColors: Record<string, string> = {
   refused: "bg-red-100 text-red-700",
 };
 
-export default async function ApplicationsPage() {
-  const user = await getSession();
-  if (!user) redirect("/login");
+interface App {
+  id: string;
+  productName: string;
+  applicationClass: string;
+  status: string;
+  updatedAt: string;
+  medicinalIngredients: { id: string }[];
+  documents: { status: string }[];
+  createdBy: { name: string };
+}
 
-  const applications = await prisma.application.findMany({
-    orderBy: { updatedAt: "desc" },
-    include: {
-      createdBy: { select: { name: true } },
-      documents: { select: { status: true } },
-      medicinalIngredients: { select: { id: true } },
-    },
-  });
+export default function ApplicationsPage() {
+  const [user, setUser] = useState<{ name: string; role: string } | null>(null);
+  const [applications, setApplications] = useState<App[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/auth/me").then(r => r.ok ? r.json() : null),
+      fetch("/api/applications").then(r => r.ok ? r.json() : []),
+    ]).then(([u, apps]) => {
+      setUser(u);
+      setApplications(Array.isArray(apps) ? apps : []);
+      setLoading(false);
+    });
+  }, []);
+
+  const doDelete = async (id: string) => {
+    if (confirmDel !== id) { setConfirmDel(id); return; }
+    setDeleting(true);
+    const res = await fetch(`/api/applications/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      setApplications(prev => prev.filter(a => a.id !== id));
+      setConfirmDel(null);
+    }
+    setDeleting(false);
+  };
+
+  const isEditable = user?.role !== "viewer";
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen bg-gray-50">
+        {user && <Sidebar user={user as never} />}
+        <GlobalSearch />
+        <main className="flex-1 p-6 min-w-0 flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar user={user} />
+      <Sidebar user={user as never} />
       <GlobalSearch />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="flex-1 p-6 min-w-0">
         <div className="flex items-center justify-between mb-8">
           <h2 className="text-2xl font-bold text-gray-900">Applications</h2>
           <Link
@@ -59,15 +100,17 @@ export default async function ApplicationsPage() {
                 <th className="text-left text-xs font-medium text-gray-500 px-5 py-3">Documents</th>
                 <th className="text-left text-xs font-medium text-gray-500 px-5 py-3">Created By</th>
                 <th className="text-left text-xs font-medium text-gray-500 px-5 py-3">Updated</th>
+                {isEditable && <th className="text-left text-xs font-medium text-gray-500 px-5 py-3">Actions</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {applications.map((app) => {
                 const approvedDocs = app.documents.filter((d) => d.status === "approved").length;
                 const href = `/applications/${app.id}`;
+                const isConfirming = confirmDel === app.id;
 
                 return (
-                  <tr key={app.id} className="hover:bg-gray-50 cursor-pointer">
+                  <tr key={app.id} className="hover:bg-gray-50">
                     <td className="px-5 py-3">
                       <Link href={href} className="text-sm font-medium text-blue-600 hover:text-blue-800">
                         {app.productName}
@@ -85,12 +128,45 @@ export default async function ApplicationsPage() {
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-500">{app.createdBy.name}</td>
                     <td className="px-5 py-3 text-xs text-gray-400">{new Date(app.updatedAt).toLocaleDateString()}</td>
+                    {isEditable && (
+                      <td className="px-5 py-3">
+                        {isConfirming ? (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => doDelete(app.id)}
+                              disabled={deleting}
+                              className="px-2.5 py-1 text-xs font-medium text-white bg-red-600 rounded hover:bg-red-700 disabled:opacity-50"
+                            >
+                              {deleting ? "..." : "Confirm"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDel(null)}
+                              disabled={deleting}
+                              className="px-2.5 py-1 text-xs text-gray-500 hover:bg-gray-100 rounded"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => doDelete(app.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete application"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
               {applications.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-sm text-gray-400">
+                  <td colSpan={isEditable ? 8 : 7} className="px-5 py-8 text-center text-sm text-gray-400">
                     No applications yet.
                   </td>
                 </tr>
