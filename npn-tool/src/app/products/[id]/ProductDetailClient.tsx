@@ -46,7 +46,8 @@ function formatStage(s: string) { return s.replace(/_/g, " ").replace(/\b\w/g, c
 interface Product {
   id: string; name: string; brandName: string; stage: string; priority: string;
   assignedTo: string; dosageForm: string; routeOfAdmin: string; productConcept: string;
-  targetMarket: string; applicationClass: string; npnNumber: string; applicationId: string | null;
+  targetMarket: string; targetCondition: string; targetConditionDetail: string;
+  applicationClass: string; npnNumber: string; applicationId: string | null;
   reviewStatus: string; reviewerId: string; reviewNotes: string; notes: string;
   handoffReady: boolean; createdAt: string; updatedAt: string;
 }
@@ -69,6 +70,9 @@ export default function ProductDetailClient({
     routeOfAdmin: product.routeOfAdmin, productConcept: product.productConcept,
     priority: product.priority, assignedTo: product.assignedTo, notes: product.notes,
     targetMarket: product.targetMarket,
+    targetCondition: product.targetCondition || "",
+    targetConditionDetail: product.targetConditionDetail || "",
+    applicationClass: product.applicationClass || "",
   });
   const [selectedReviewerId, setSelectedReviewerId] = useState("");
 
@@ -97,7 +101,7 @@ export default function ProductDetailClient({
   const save = async (extra?: Record<string, unknown>) => {
     setSaving(true);
     const res = await fetch(`/api/products/${product.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, ...extra }) });
-    if (res.ok) { const u = await res.json(); setProduct(u); setForm(f => ({ ...f, name: u.name, brandName: u.brandName, dosageForm: u.dosageForm, routeOfAdmin: u.routeOfAdmin, productConcept: u.productConcept, priority: u.priority, assignedTo: u.assignedTo, notes: u.notes, targetMarket: u.targetMarket })); }
+    if (res.ok) { const u = await res.json(); setProduct(u); setForm(f => ({ ...f, name: u.name, brandName: u.brandName, dosageForm: u.dosageForm, routeOfAdmin: u.routeOfAdmin, productConcept: u.productConcept, priority: u.priority, assignedTo: u.assignedTo, notes: u.notes, targetMarket: u.targetMarket, targetCondition: u.targetCondition || "", targetConditionDetail: u.targetConditionDetail || "", applicationClass: u.applicationClass || "" })); }
     setSaving(false);
   };
   const moveStage = (s: string) => save({ stage: s });
@@ -235,8 +239,11 @@ export default function ProductDetailClient({
                     <a href={`/applications/${product.applicationId}`} className="block text-sm text-red-600 hover:text-red-700 font-medium mt-2">View PLA Application &rarr;</a>
                   ) : isEditable && (
                     <button onClick={async () => {
-                      const res = await fetch("/api/applications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productName: product.name, brandName: product.brandName, dosageForm: product.dosageForm, routeOfAdmin: product.routeOfAdmin, applicationClass: product.applicationClass || "I", productConcept: product.productConcept }) });
-                      if (res.ok) { const app = await res.json(); await fetch(`/api/products/${product.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ applicationId: app.id, stage: "filing" }) }); router.push(`/applications/${app.id}`); }
+                      try {
+                        const res = await fetch("/api/applications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productName: product.name, brandName: product.brandName, dosageForm: product.dosageForm, routeOfAdmin: product.routeOfAdmin, applicationClass: product.applicationClass || "I", productConcept: product.productConcept }) });
+                        if (res.ok) { const app = await res.json(); await fetch(`/api/products/${product.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ applicationId: app.id, stage: "filing" }) }); router.push(`/applications/${app.id}`); }
+                        else { const d = await res.json().catch(() => ({})); alert(d.error || "Failed to create application"); }
+                      } catch { alert("Network error creating application"); }
                     }} className="w-full mt-3 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">Create PLA Application</button>
                   )}
                 </div>
@@ -408,7 +415,7 @@ export default function ProductDetailClient({
                       <option value="">Select reviewer...</option>
                       {teamUsers.filter(u => u.id !== user.id).map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
                     </select>
-                    <button onClick={async () => { if (!selectedReviewerId) return; await fetch(`/api/products/${product.id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reviewerId: selectedReviewerId }) }); const r = await fetch(`/api/products/${product.id}`); if (r.ok) setProduct(await r.json()); }} disabled={!selectedReviewerId}
+                    <button onClick={async () => { if (!selectedReviewerId) return; try { await fetch(`/api/products/${product.id}/review`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ reviewerId: selectedReviewerId }) }); const r = await fetch(`/api/products/${product.id}`); if (r.ok) setProduct(await r.json()); } catch { alert("Failed to request review"); } }} disabled={!selectedReviewerId}
                       className="w-full px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50">Request Review</button>
                   </div>
                 )}
@@ -416,11 +423,11 @@ export default function ProductDetailClient({
                   <div className="space-y-2 pt-2 border-t border-gray-100">
                     <p className="text-xs text-gray-500 font-medium">You are the assigned reviewer</p>
                     <div className="flex gap-2">
-                      <button onClick={async () => { await fetch(`/api/products/${product.id}/review`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "approved", notes: "" }) }); const r = await fetch(`/api/products/${product.id}`); if (r.ok) setProduct(await r.json()); }}
+                      <button onClick={async () => { try { await fetch(`/api/products/${product.id}/review`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "approved", notes: "" }) }); const r = await fetch(`/api/products/${product.id}`); if (r.ok) setProduct(await r.json()); } catch { alert("Failed to submit review"); } }}
                         className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700">Approve</button>
-                      <button onClick={async () => { const n = prompt("What changes are needed?"); if (n === null) return; await fetch(`/api/products/${product.id}/review`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "needs_changes", notes: n }) }); const r = await fetch(`/api/products/${product.id}`); if (r.ok) setProduct(await r.json()); }}
+                      <button onClick={async () => { const n = prompt("What changes are needed?"); if (n === null) return; try { await fetch(`/api/products/${product.id}/review`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "needs_changes", notes: n }) }); const r = await fetch(`/api/products/${product.id}`); if (r.ok) setProduct(await r.json()); } catch { alert("Failed to submit review"); } }}
                         className="flex-1 px-3 py-2 text-sm bg-yellow-500 text-white rounded-lg hover:bg-yellow-600">Changes</button>
-                      <button onClick={async () => { const n = prompt("Reason for rejection?"); if (n === null) return; await fetch(`/api/products/${product.id}/review`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "rejected", notes: n }) }); const r = await fetch(`/api/products/${product.id}`); if (r.ok) setProduct(await r.json()); }}
+                      <button onClick={async () => { const n = prompt("Reason for rejection?"); if (n === null) return; try { await fetch(`/api/products/${product.id}/review`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ decision: "rejected", notes: n }) }); const r = await fetch(`/api/products/${product.id}`); if (r.ok) setProduct(await r.json()); } catch { alert("Failed to submit review"); } }}
                         className="flex-1 px-3 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">Reject</button>
                     </div>
                   </div>

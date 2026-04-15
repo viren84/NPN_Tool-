@@ -46,8 +46,8 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         brandName: sanitizeHtml(((body.brandName as string) || "").trim()),
-        stage: body.stage === "string" ? (body.stage as string) : "research",
-        priority: body.priority === "string" ? (body.priority as string) : "medium",
+        stage: typeof body.stage === "string" ? (body.stage as string) : "research",
+        priority: typeof body.priority === "string" ? (body.priority as string) : "medium",
         dosageForm: sanitizeHtml(((body.dosageForm as string) || "").trim()),
         routeOfAdmin: sanitizeHtml(((body.routeOfAdmin as string) || "").trim()),
         productConcept: sanitizeHtml(((body.productConcept as string) || "").trim()),
